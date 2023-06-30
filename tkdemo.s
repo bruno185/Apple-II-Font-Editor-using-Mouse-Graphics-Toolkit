@@ -1511,6 +1511,7 @@ HButton_5   cmp #InClose        ; 5: close box of front window
             bne HButton_6
             jmp DoClose
 ;
+;
 HButton_6   rts ; should never get here!
             ; since all possible values of which_area are processed
 ;
