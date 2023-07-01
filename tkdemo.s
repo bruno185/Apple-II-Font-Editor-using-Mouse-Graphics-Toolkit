@@ -255,7 +255,7 @@ DrawWin1 equ *                              ; SmallWindow
             ; list. 
             rts
 
-testRect    dw 10,20,136,110
+testRect    dw 10,30,136,120                    ; bounding box
 DrawWin2 equ *                                  ; BigWindow   
             TK_call HideCursor;0
 
@@ -314,7 +314,7 @@ MakeRect                                    ; Set up aRect var
             sta aRect
             lda BlackBits+1
             sta aRect+1
-
+            
             lda BlackBits+2                 ; top.left.y
             sta aRect+2
             lda BlackBits+3
@@ -405,7 +405,7 @@ IntiBitBoxX                                     ; set box.x to BasePoint.x
             rts  
 
 TheChar     ds 1     
-BasePoint   dw 10,20
+BasePoint   dw 10,30
 aRect       dw 10,30,70,50
 row         ds 1
 col         ds 1
@@ -1632,22 +1632,39 @@ DC_2        sta win_coord                   ; populate parameters for ScreenToWi
             jmp inbox
 outbox      jmp RingBell
 
-inbox       TK_call MoveTo;tmppt                    ; debug 
+inbox       TK_call MoveTo;tmppt                    ; move pen  
             jsr DodivX                              ; divide windowx-margin by gapx
             lda dividend                            ; dividend = result of division
-            sta SquareX                             ; save it to SquareX var
-            jsr ByteOut2                            ; debug
+            sta SquareX                             ; save it to SquareX var (= X coord. of clicked square)
+            ;jsr ByteOut2                           ; debug
             ;lda dividend+1                         ; useless : SquareX should be in [0..7] (chars are 7 bits wide)
             ;sta SquareX+1
 
             jsr DodivY                              ; divide windowx-margin by gapx
             lda dividend                            ; dividend = result of division
-            sta SquareY                             ; save it to SquareY var
-            jsr ByteOut2                            ; debug
+            sta SquareY                             ; save it to SquareY var (= Y coord. of clicked square)
+            ;jsr ByteOut2                           ; debug
             ;lda dividend+1                         ; useless : SquareX should be in [0..8] (chars are 9 bits high)
             ;sta SquareY+1
                                                     ;
                                                     ; Find corresponding byte in font data
+; font-record
+    ; fonttype: byte (0 for regular-width, $80 for double-width)
+    ; lastchar: byte (ASCII value of last char in font; 0..255)
+    ; height: byte (height of font, in rows of pixels; 1..16)
+    ; charwidth: array [0..lastchar] of byte 
+        ; (each entry contains the width of the corresponding character;  0..7 for regular-width fonts, 
+        ; 0..14 for douhle-width fonts. The widths specify the number of dots to display horizontally 
+        ; when the character is drawn.)
+    ; charimage: (for regular-width fonts)
+        ; array [1..height] of
+        ; array [0..lastchar] of bits
+
+; In this case; we have a regular-width font :
+; fonttype = 0
+; lastchar = 128
+; height = 9
+
             lda SquareY                             ; get SquareY
             asl                                     ; *2
             tax
@@ -1661,39 +1678,39 @@ inbox       TK_call MoveTo;tmppt                    ; debug
             
 getByte     lda $FFFF                               ; get bye in font data
             sta TheByte
-            jsr ByteOut2                            ; debug
+            ;jsr ByteOut2                            ; debug
             
                                                     ; Prepare color inversion of square (black <-> white)
                                                     ; by setting coordinate of square to paint
-            jsr InitBitBox                          ; init aRect coordinates
+            jsr InitBitBox                          ; init. aRect coordinates
             jsr MakeRect                            ; make a rect
 
+                                                    ; Adjust aRect position
+                                                    ; to make it match the clicked square
             ldx SquareX
 DoRectX     cpx #0                                  ; shift rect right SquareX times
             beq DoRectY
             jsr ShitRectR
             dex 
             jmp DoRectX 
-
 DoRectY     ldx SquareY
-DoRectY2    cpx #0                                  ; shift rect right SquareY times
+DoRectY2    cpx #0                                  ; shift rect down SquareY times
             beq DoRectF
             jsr ShitRectD
             dex
             jmp DoRectY2 
-
 DoRectF     jsr InsetRect                           ; make aRect smaller
             ldx SquareX
             lda BitTable,x                          ; get bit to poke
             and TheByte
             beq DoSetB
-
                                                     ; poke modified value in font data
 DoClearB                                            ; bit to poke = 1 ==> 0
             lda BitTable,x
             eor #$FF
             and TheByte
             jsr DoPoke                              ; store new value in font data 
+            pha                                     ; and on stack  
             TK_call SetPattern;White                ; paint inverted square
             TK_call PaintRect;aRect
             beq EndClick
@@ -1701,23 +1718,27 @@ DoClearB                                            ; bit to poke = 1 ==> 0
 DoSetB                                              ; bit to poke = 0 ==> 1
             lda TheByte
             ora BitTable,x
-            jsr DoPoke                              ; store new value in Font data           
+            jsr DoPoke                              ; store new value in Font data
+            pha                                     ; and on stack  
             TK_call SetPattern;Black                ; paint inverted square
             TK_call PaintRect;aRect
 
-EndClick    rts
+EndClick    TK_call DrawText;LabelByte
+            pla                                     ; get value back from stack
+            jsr ByteOut2                            ; print it                           
+            rts
  
-DoPoke      ldx getByte+1
-            stx $06
+DoPoke      ldx getByte+1                           ; get address of byte in font data
+            stx $06                                 ; setup a pointer in ZP with it
             ldx getByte+2
             stx $07
             ldy #0
-            sta ($06),y
+            sta ($06),y                             ; poke value at this address
             rts
 
-ShitRectR   lda aRect
+ShitRectR   lda aRect                               ; shift aRect right gapx pixels
             clc
-            adc #18
+            adc #gapx
             sta aRect
             lda aRect+1
             adc #0
@@ -1725,16 +1746,16 @@ ShitRectR   lda aRect
 
             lda aRect+4
             clc
-            adc #18
+            adc #gapx
             sta aRect+4
             lda aRect+5
             adc #0
             sta aRect+5
             rts            
 
-ShitRectD   lda aRect+2
+ShitRectD   lda aRect+2                             ; shift aRect down gapy pixels
             clc
-            adc #10
+            adc #gapy
             sta aRect+2
             lda aRect+3
             adc #0
@@ -1742,7 +1763,7 @@ ShitRectD   lda aRect+2
 
             lda aRect+6
             clc
-            adc #10
+            adc #gapy
             sta aRect+6
             lda aRect+7
             adc #0
@@ -1760,6 +1781,10 @@ BitTable    db %00000001
 TheByte     ds 1
 
 tmppt       dw 100,10
+LabelByte   dw LByte
+            dfb 8
+LByte       asc 'Byte : $'
+
 win_coord   equ *
 winid       equ *
 screenx     equ *+1
@@ -1769,9 +1794,9 @@ windowy     equ *+7
             ds 9
 out_R       equ *   
 out_R_tl_x  dw 10
-out_R_tl_y  dw 20
+out_R_tl_y  dw 30
 out_R_bd_x  dw 136
-out_R_bd_y  dw 110
+out_R_bd_y  dw 120
 
 bfontTable  da SystemFont+3+128
             da SystemFont+3+128+128
