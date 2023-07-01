@@ -309,5 +309,33 @@ esp     jsr cout
         prnstr ]1
         EOM
 *
+Main2Aux MAC                               ; copy data from MAIN to AUX memory (same address!)
+        lda #>]1
+        sta $3d         ; source high
+        sta $43         ; dest high
+        lda #<]1      
+        sta $3c         ; source low
+        sta $42         ; dest low
+        lda #>]2        ; source end low
+        sta $3f 
+        lda #<]2          ; source end high
+        sta $3e
+        sec             ; main to aux
+        jsr AUXMOV     ; move
+        EOM
+
+Aux2Main MAC                              ; copy program from AUX to MAIN memory (same address!)
+        lda #>]1
+        sta $3d         ; source high
+        sta $43         ; dest high
+        lda #<]1      
+        sta $3c         ; source low
+        sta $42         ; dest low
+        lda #>]2        ; source end low
+        sta $3f 
+        lda #<]2         ; source end high
+        sta $3e
+        clc             ; main to aux
+        jsr AUXMOV      ; move
+        EOM
         FIN
-*

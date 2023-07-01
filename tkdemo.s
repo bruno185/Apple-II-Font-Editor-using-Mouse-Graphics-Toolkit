@@ -20,6 +20,7 @@ TK_call     MAC                     ; Mouse Graphics Toolkit (including Gaphic P
             EOM 
 *
 SystemFont      equ $8800           ; Font file is loaded at this address par Startup basic program.
+SystemFontE     equ SystemFont+1283 ; End of font data in memory
 SaveBuffer      equ $A000           ; Location of buffer for saving screen data
 RingBell        equ $FBDD           ; ROM routine 
 MonitorEntry    equ 65385           ; ROM routine (= -151)
@@ -35,6 +36,10 @@ InThumb         equ 5
 UseInterrupts   equ 0 ; Yes
 
 start       equ *
+
+
+            ;Main2Aux start;prgend
+            Main2Aux SystemFont;SystemFontE           ; save original font data to AUX
 ;
 ; set up the desk top
 ;
