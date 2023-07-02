@@ -38,44 +38,19 @@ start       equ *
 
 
             ;Main2Aux start;prgend
-            Main2Aux SystemFont;SystemFontE     ; save original font data to AUX
-
-            jsr DoPrefix            ; set prefix in path var (strating and ending with /)  
-            ldy #0
-            ldx path                ; get prefix length
-:1          inx                     ; set x index to next position in prefix
-            lda tfont+1,y             ; read char in file name string
-            beq DoOpen              ; if value = 0 : exit loop
-            sta path,x              ; store char at the end of prefix string
-            iny                     ; next char
-            jmp :1                  ; loop
-
-DoOpen                              ; adjust prefix length
-            lda path                ; by adding file name length
-            clc
-            adc tfont               ; file name length
-            sta path
-
-            jsr MLI                 ; open file 
+            Main2Aux SystemFont;SystemFontE           ; save original font data to AUX
+            jsr MLI
             dfb open
             da openparam
-            bcc DoLoad
-            jmp error
-DoLoad                              ; load it in memory
-            lda refnum              ; copy ref num of open file for next MLI calls
-            sta refnum2 
-            sta refnum3
 
-            jsr MLI
-            dfb read
-            da readparam
-            bcc CloseFile
-            jmp error
+openparam   dfb 3
+            dw tfont
+            dw $8800
+            ds 1
 
-CloseFile                           ; and close file
-            jsr MLI
-            dfb close
-            da closeparam
+            brk
+tfont       str '/TK/TEST.FONT'
+
 
 ; set up the desk top
 ;
@@ -2554,79 +2529,4 @@ MyChar          ds 9
 MyChar2         ds 9
 MyCharwidth     ds 1
 
-
-error       brk                     ; display en error message here
-            rts
-tfont       str 'TEST.FONT'
-            dfb 0
-
-openparam   dfb 3
-            dw path
-            dw $2000                ; ATTENTION !!!!!
-refnum      ds 1
-
-readparam
-            dfb 4
-refnum2     ds 1
-            dw $8800
-            dw 1283
-            dw 0
-
-closeparam
-            dfb 1
-refnum3     ds 1
-
-DoPrefix
-          jsr MLI           ; Fetprefix, prefix ==> "path"
-          hex c7
-          da prefix
-          bcc suitegp
-          jsr error
-          bra men
-suitegp
-          lda path          ; get prefix length
-          beq noprefix      ; length = 0 : prefix not set
-          jmp goodpfx       ; > 0 prefix is already set : rts
-
-noprefix
-          lda devnum        ; last used slot/drive 
-          sta unit          ; param of online MLI call
-men       jsr MLI
-          hex c5            ; on_line call : get prefix in path var
-          da onlinep
-          bcc suite
-          jsr error
-          bra men        ; loop if error l'erreur (user need to put good floppy in drive)
-suite     lda path
-          and #$0f       ; length in low nibble
-          sta path
-          tax
-l1        lda path,x
-          sta path+1,x   ; shift 1 byte
-          dex
-          bne l1
-          inc path
-          inc path       ; long = long + 2  for starting and ending /
-          ldx path
-          lda #$af
-          sta path,x     ; / at the end of prefix
-          sta path+1     ; / at the beginning of prefix
-
-          jsr MLI        ; set_prefix
-          hex c6
-          da prefix
-          bcc goodpfx
-          jsr error
-goodpfx   rts
-
-prefix    hex 01
-          da path
-
-path      ds 256
-
-onlinep    hex 02
-unit      ds 1
-          da path
-
-
-prgend  equ *
+prgend  equ *   
