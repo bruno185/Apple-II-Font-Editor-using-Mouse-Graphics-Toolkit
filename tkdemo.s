@@ -143,7 +143,7 @@ CloseFile                           ; and close file
 * TEST
             ;jsr test_getbuffer
 * /TEST
-
+ 
 ********************************************
 *
 * This is the start of the Main Loop
