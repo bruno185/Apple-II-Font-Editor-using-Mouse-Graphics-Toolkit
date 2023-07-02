@@ -39,11 +39,9 @@ start       equ *
 
             ;Main2Aux start;prgend
             Main2Aux SystemFont;SystemFontE     ; save original font data to AUX
-
             jsr DoPrefix            ; set prefix in path var (strating and ending with /)  
 
-
-            ldy #0                  ; add file mane string to path
+            ldy #0                  ; add file name string to prefix
             ldx path                ; get prefix length
 :1          inx                     ; set x index to next position in prefix
             lda tfont+1,y           ; read char in file name string
