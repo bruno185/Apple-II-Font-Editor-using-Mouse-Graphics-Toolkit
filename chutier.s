@@ -96,6 +96,39 @@ IntiBitBoxX                                     ; set box.x to BasePoint.x
             rts  
 
 
+DrawWin1 equ *                              ; SampleWindow
+                                            ; display a polygon
+            TK_call SetPenMode;xSrcXOR
+            ; SetPenMode  : sets the current pen mode to the specified mode. 
+            ; Parameter :
+            ; penmode (input) : integer (the high byte is ignored).
+            ; xSrcXOR is a pointer to pen mode. Points to value 2, "penXOR"
+            ; Pen modes :
+                ; Mode 0 (pencopy): Copy pen to destination.
+                ; Mode 1 (penOR): Overlay (OR) pen and destination.
+                ; Mode 2 (penXOR): Exclusive or (XOR) pen with destination.
+                ; Mode 3 (penBIC): Bit Clear (BIC) pen with destination ((NOT pen) AND destination).
+                ; Mode 4 (notpencopy): Copy inverse pen to destination.
+                ; Mode 5 (nocpenOR): Overlay (OR) inverse pen wich destination.
+                ; Mode 6 (notpenXOR): Exclusive or (XOR) inverse pen with destination.
+                ; Mode 7 (notpenBIC): Bit Clear (BIC) inverse pen with destination (pen AND destination)
+
+            TK_call PaintPoly;xPolygon
+            ; PaintPoly : paints (fills) the interior of the specified polygon(s) 
+            ; with the current pattern.
+            ; Parameters : xPolygon : pointer to a polygon structure (see below)
+            ; Due to a restriction in the polygon-drawing algorithm, a polygon list
+            ; cannot have more than eight peaks. (The mathematical term is strict 
+            ; local maxima).
+            ; A polygon is a list of vercices, each of which is a point. Polygons in
+            ; the graphics primicives are defined as a list that contains one or more
+            ; polygons. For each polygon in the list, there is a paramecer named
+            ; LastPoly that determines whecher that polygon is the last one in the
+            ; list. 
+            rts
+xPolygon    dfb 3,0                         ; 3 vertices, 0 : no next polygon
+            dw 10,10,100,100,40,100         ; (x,y) for each vertice
+
 DrawWin3    equ *                           ; CharsWindow
                                             ; display 128 chars (ascii 0 to 127), 8 rows of 16 chars
             ldx #3
@@ -164,3 +197,18 @@ CurChar     dfb 0                           ; char value var
             TK_call PaintRect;myRect1
             TK_call SetPattern;Black
             TK_call PaintRect;myRect2
+
+copymaintoaux           ; copy program to AUX memory
+                lda #>start
+                sta $3d         ; source high
+                sta $43         ; dest high
+                lda #<start      
+                sta $3c         ; source low
+                sta $42         ; dest low
+                lda #>prgend    ; source end low
+                sta $3f 
+                lda #<prgend    ; source end high
+                sta $3e
+                sec             ; main to aux
+                jsr AUXMOV      ; move
+                rts

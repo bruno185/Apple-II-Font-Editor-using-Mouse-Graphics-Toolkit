@@ -39,43 +39,9 @@ start       equ *
 
             ;Main2Aux start;prgend
             Main2Aux SystemFont;SystemFontE     ; save original font data to AUX
-            jsr DoPrefix            ; set prefix in path var (strating and ending with /)  
-
-            ldy #0                  ; add file name string to prefix
-            ldx path                ; get prefix length
-:1          inx                     ; set x index to next position in prefix
-            lda tfont+1,y           ; read char in file name string
-            beq DoOpen              ; if value = 0 : exit loop
-            sta path,x              ; store char at the end of prefix string
-            iny                     ; next char
-            jmp :1                  ; loop
-
-DoOpen                              ; adjust prefix length
-            lda path                ; by adding file name length
-            clc
-            adc tfont               ; file name length
-            sta path
-
-            jsr MLI                 ; open file 
-            dfb open
-            da openparam
-            bcc DoLoad
-            jmp error
-DoLoad                              ; load it in memory
-            lda refnum              ; copy ref num of open file for next MLI calls
-            sta refnum2 
-            sta refnum3
-
-            jsr MLI
-            dfb read
-            da readparam
-            bcc CloseFile
-            jmp error
-
-CloseFile                           ; and close file
-            jsr MLI
-            dfb close
-            da closeparam
+            lda #0
+            sta LoadFlag
+            jsr LoadFont
 
 ; set up the desk top
 ;
@@ -245,10 +211,10 @@ DrawIt equ * ; Refresh window whose id is passed in A-Reg
             ; DrawIt is called directly by update process. In this case, no need for setting grafport,
             ; since it's done by BeginUpdate call.
             ; Otherwise, DrawIt follows DrawItB, which set the right port.
-            cmp SmallWindow
+            cmp SampleWindow
             bne DrawIt_1
             jmp DrawWin1
-DrawIt_1    cmp BigWindow
+DrawIt_1    cmp EditFontW
             bne DrawIt_2
             jmp DrawWin2
 DrawIt_2    cmp CharsWindow
@@ -265,39 +231,21 @@ DrawIt_5    jsr RingBell
             rts ; Should never get here!
 ;
 ;
-DrawWin1 equ *                              ; SmallWindow
-                                            ; display a polygon
-            TK_call SetPenMode;xSrcXOR
-            ; SetPenMode  : sets the current pen mode to the specified mode. 
-            ; Parameter :
-            ; penmode (input) : integer (the high byte is ignored).
-            ; xSrcXOR is a pointer to pen mode. Points to value 2, "penXOR"
-            ; Pen modes :
-                ; Mode 0 (pencopy): Copy pen to destination.
-                ; Mode 1 (penOR): Overlay (OR) pen and destination.
-                ; Mode 2 (penXOR): Exclusive or (XOR) pen with destination.
-                ; Mode 3 (penBIC): Bit Clear (BIC) pen with destination ((NOT pen) AND destination).
-                ; Mode 4 (notpencopy): Copy inverse pen to destination.
-                ; Mode 5 (nocpenOR): Overlay (OR) inverse pen wich destination.
-                ; Mode 6 (notpenXOR): Exclusive or (XOR) inverse pen with destination.
-                ; Mode 7 (notpenBIC): Bit Clear (BIC) inverse pen with destination (pen AND destination)
-
-            TK_call PaintPoly;xPolygon
-            ; PaintPoly : paints (fills) the interior of the specified polygon(s) 
-            ; with the current pattern.
-            ; Parameters : xPolygon : pointer to a polygon structure (see below)
-            ; Due to a restriction in the polygon-drawing algorithm, a polygon list
-            ; cannot have more than eight peaks. (The mathematical term is strict 
-            ; local maxima).
-            ; A polygon is a list of vercices, each of which is a point. Polygons in
-            ; the graphics primicives are defined as a list that contains one or more
-            ; polygons. For each polygon in the list, there is a paramecer named
-            ; LastPoly that determines whecher that polygon is the last one in the
-            ; list. 
+DrawWin1    equ *                              ; SampleWindow
+            TK_call MoveTo;lazypt
+            TK_call DrawText;lazyfox
+            TK_call MoveTo;lazyptC
+            TK_call DrawText;lazyfoxC
+ 
             rts
+lazyfox     da lazy_txt+1
+lazy_txt    str 'the lazy fox jumps over the brown dog'
+lazypt      dw 10,10
+lazyfoxC     da lazy_txtC+1
+lazy_txtC    str 'THE LAZY FOX JUMPS OVER THE BROWN DOG'
+lazyptC      dw 10,20
 
-testRect    dw 10,30,136,120                    ; bounding box
-DrawWin2 equ *                                  ; BigWindow   
+DrawWin2 equ *                                  ; EditFontW   
             TK_call HideCursor;0
 
             TK_call SetPattern;White 
@@ -345,7 +293,12 @@ nextline
             bne ShowChar_1
             TK_call ShowCursor;0
 
-            TK_call FrameRect;testRect        ; show grid
+            TK_call FrameRect;edit_r            ; show bounding box
+            TK_call FrameRect;refresh_r
+
+            TK_call MoveTo;RefrPt
+            TK_call DrawText;LabelRefr
+            
             rts
 
 MakeRect                                    ; Set up aRect var 
@@ -889,11 +842,11 @@ L8          dw *+3
 *
 * Date for drawing windows
 *
+pencopy     dfb 0
 xSrcCOPY    dfb 4                           ; penmode = notpencopy : Copy inverse pen to destination.
 xSrcXOR     dfb 2                           ; penmode = penBIC  : Bit Clear (BIC) pen with destination ((NOT pen) 
                                             ; AND destination))
-xPolygon    dfb 3,0                         ; 3 vertices, 0 : no next polygon
-            dw 10,10,100,100,40,100         ; (x,y) for each vertice
+
 
 * polygon list struture :
 ; db : nb. of vertices
@@ -962,11 +915,11 @@ HandleMenu  equ * ; Takes result from menu commands and acts accordingly.
             bne HM_1
             TK_call FrontWindow;OnTop               ; get top window
             lda OnTop                               ; in A
-            cmp BigWindow                           ; = BigWindow ?
+            cmp EditFontW                           ; = EditFontW ?
             bne HM_exit                             ; no : rts
             lda MenuChar                            ; get ascii value of key
             sta DispChar                            ; set it for draw function for this window
-            lda BigWindow
+            lda EditFontW
             jmp DrawItB                             ; draw window (+SetPort)
 
 HM_exit     rts 
@@ -1040,15 +993,26 @@ M1_2        TK_call CloseWindow;DialogWindow
 ;
 h_menu_2    equ *
             lda MenuItem
-            cmp #1
+            cmp #4                              ; enter monitor
             bne M2_1
             lda #$40
             sta Quit
-M2_1        cmp #2
+M2_1        cmp #5                              ; Quit
             bne M2_2
             lda #$80
             sta Quit
-M2_2        rts
+M2_2        cmp #3                              ; reset menu
+            bne M2_3
+            Aux2Main SystemFont;SystemFontE 
+            rts
+M2_3        cmp #1
+            bne M2_4
+            lda #1
+            sta LoadFlag
+            jsr LoadFont
+            rts
+
+M2_4        rts
 ;
 h_menu_3    equ *
 end_menu_3  rts
@@ -1639,11 +1603,11 @@ Content_1   lda WindowFound
 Content_2   rts
 
 ******************************************************************************
-DoClickIn                                   ; after click in BigWindow content
-            jsr RingBell
+DoClickIn                                   ; after click in EditFontW content
+            ; jsr RingBell
             lda OnTop                       ; get top window
-            cmp BigWindow                   ; = BigWindow ?
-            beq DC_2                        ; yes : proceed with a click in BigWindow
+            cmp EditFontW                   ; = EditFontW ?
+            beq DC_2                        ; yes : proceed with a click in EditFontW
             rts                             ; no : exit
 DC_2        sta win_coord                   ; populate parameters for ScreenToWindow call
             ldx #00
@@ -1662,16 +1626,40 @@ DC_2        sta win_coord                   ; populate parameters for ScreenToWi
                 ; windowy (output) integer : corresponding window y-coordinate
 
                                                     ; Test bounding box
-            sup windowx;out_R_tl_x
-            bcc outbox
-            sup windowx;out_R_bd_x
-            bcs outbox
-            sup windowy;out_R_tl_y
-            bcc outbox
-            sup windowy;out_R_bd_y
-            bcs outbox 
+            sup windowx;edit_r_tl_x
+            bcc outEditBox
+            sup windowx;edit_r_bd_x
+            bcs outEditBox
+            sup windowy;edit_r_tl_y
+            bcc outEditBox
+            sup windowy;edit_r_bd_y
+            bcs outEditBox 
             jmp inbox
-outbox      jmp RingBell
+
+outEditBox  
+            sup windowx;refresh_r
+            bcc outRefr
+            sup windowx;refresh_r+4
+            bcs outRefr
+            sup windowy;refresh_r+2
+            bcc outRefr
+            sup windowy;refresh_r+6
+            bcs outRefr 
+
+            TK_call SetPenMode;xSrcXOR
+            TK_call SetPattern;White
+            TK_call PaintRect;refresh_r
+            TK_call PaintRect;refresh_r
+            TK_call PaintRect;refresh_r
+            TK_call PaintRect;refresh_r
+            TK_call PaintRect;refresh_r
+
+            ;TK_call SetPattern;Black
+            TK_call SetPenMode;pencopy
+            jmp DrawWin2
+outRefr     
+            jmp RingBell
+
 
 inbox       TK_call MoveTo;tmppt                    ; move pen  
             jsr DodivX                              ; divide windowx-margin by gapx
@@ -1833,11 +1821,18 @@ screeny     equ *+3
 windowx     equ *+5
 windowy     equ *+7
             ds 9
-out_R       equ *   
-out_R_tl_x  dw 10
-out_R_tl_y  dw 30
-out_R_bd_x  dw 136
-out_R_bd_y  dw 120
+edit_r      equ *   
+edit_r_tl_x dw 10
+edit_r_tl_y dw 30
+edit_r_bd_x dw 136
+edit_r_bd_y dw 120
+
+refresh_r   dw 200,30,290,42
+LabelRefr   dw RefrStr
+            dfb 14
+RefrStr     asc 'Refresh Window'
+RefrPt      dw 204,41
+
 
 bfontTable  da SystemFont+3+128
             da SystemFont+3+128+128
@@ -1854,10 +1849,10 @@ SquareY     dw 0
 
 DodivX      lda windowx
             sec
-            sbc out_R_tl_x
+            sbc edit_r_tl_x
             sta dividend
             lda windowx+1
-            sbc out_R_tl_x+1
+            sbc edit_r_tl_x+1
             sta dividend+1
             lda #gapx
             sta divisor
@@ -1868,10 +1863,10 @@ DodivX      lda windowx
 
 DodivY      lda windowy
             sec
-            sbc out_R_tl_y
+            sbc edit_r_tl_y
             sta dividend
             lda windowx+1
-            sbc out_R_tl_y+1
+            sbc edit_r_tl_y+1
             sta dividend+1
             lda #gapy
             sta divisor
@@ -2139,10 +2134,10 @@ CharList    dfb 30 ; Solid Apple
 * windowport: grafport
 * nextwinfo: pointer
 
-WinfoTable dw 0,SmallWindow,BigWindow,CharsWindow
+WinfoTable dw 0,SampleWindow,EditFontW,CharsWindow
 ;
-SmallWindow dfb 1,%00000110 ; Has GoAway and Grow boxes
-            dw SmallStr
+SampleWindow dfb 1,%00000110 ; Has GoAway and Grow boxes
+            dw SampleStr
             dfb $80,$80 ;ctrl options
             dfb 3,0 ; H-ThumbMax and H-Thumb Pos
             dfb 3,0 ; V-ThumbMax and V-Thumb Pos
@@ -2153,7 +2148,7 @@ SmallWindow dfb 1,%00000110 ; Has GoAway and Grow boxes
 ;
             dw 30,30 ;window port
             dw $2000,$80
-            dw 0,0,125,50
+            dw 0,0,280,36
             ds 8,$FF
             dfb $FF,0 ; and & or mask
             dw 0,0
@@ -2164,8 +2159,8 @@ SmallWindow dfb 1,%00000110 ; Has GoAway and Grow boxes
             dw 0 ;link to next window
 ;
 ;
-BigWindow dfb 2,%00000110 ; Has GoAway and Grow Boxes
-            dw BigStr
+EditFontW dfb 2,%00000110 ; Has GoAway and Grow Boxes
+            dw EditFontWStr
             dfb $80,$80 ; ctrl options
             dfb 3,0 ; H-ThumbMax and H-Thumb Pos
             dfb 3,0 ; V-ThumbMax and V-Thumb Pos
@@ -2255,9 +2250,9 @@ DialogWindow dfb 5,%00000001 ; Dialog Box
 ;
             dw 0 ;link to next window
 ;
-SmallStr    str 'Small Window'
-BigStr      str 'Big Window'
-CharsStr    str 'Font Display'
+SampleStr    str 'Sample '
+EditFontWStr str 'Edit font'
+CharsStr    str 'Display Font'
 TestStr     str 'Test Window'
 ;
 ;
@@ -2378,7 +2373,7 @@ TheMenu     dfb 4,0                     ; number of menus, (7 in this program) +
             dw EditStr,EditMenu
             ds 6,0
             dfb 4,0                     ; Windows menu
-            dw WindowStr,WindowMenu
+            dw FontStr,FontMenu
             ds 6,0
 
 ;
@@ -2404,8 +2399,14 @@ AppleMenu   dfb 1                       ; number of items In the menu
 
             dw AppleItem1               ; pointer to item string
 ;
-FileMenu    dfb 2
+FileMenu    dfb 5
             ds 5,0
+            dfb 0,0,0,0 
+            dw FileItemLoad
+            dfb 0,0,0,0 
+            dw FileItemSave
+            dfb 0,0,0,0 
+            dw FileItemReset            
             dfb 0,0,0,0                 ; Monitor Entry
             dw FileItem1
             dfb 3,0,'Q','q' ; Quit
@@ -2432,7 +2433,7 @@ EditMenu    dfb 7
             dfb 0,0,0,0 ;Show Clipboard
             dw EditItem7
 ;
-WindowMenu  dfb 7
+FontMenu    dfb 7
             ds 5,0
             dfb 0,0,0,0
             dw WindowItem1
@@ -2454,7 +2455,7 @@ WindowMenu  dfb 7
 AppleStr dfb 1,30 ;AppleChar
 FileStr str 'File'
 EditStr str 'Edit'
-WindowStr str 'Windows'
+FontStr str 'Font'
 MTStr str 'Menu Test'
 WTStr str 'Window Test'
 DummyStr str 'Dummy'
@@ -2463,6 +2464,9 @@ AppleItem1 str 'About this demo...'
 ;
 FileItem1 str 'Enter Monitor'
 FileItem2 str 'Quit'
+FileItemLoad str 'Load font'
+FileItemSave str 'Save font'
+FileItemReset str 'Reset font'
 ;
 EditItem1 str 'Undo'
 EditItem2 str 'Cut'
@@ -2472,9 +2476,9 @@ EditItem5 str 'Clear'
 EditItem6 str 'Select All'
 EditItem7 str 'Show Clipboard'
 ;
-WindowItem1 str 'Small Window'
-WindowItem2 str 'Big Window'
-WindowItem3 str 'Font Display'
+WindowItem1 str 'Sample '
+WindowItem2 str 'Edit Font'
+WindowItem3 str 'Display Font'
 WindowItem5 str 'Drag'
 WindowItem6 str 'Grow'
 WindowItem7 str 'Hide'
@@ -2493,21 +2497,6 @@ Wait            equ *
                 bit kbdstrb                             ; test keybord input
                 bpl Wait                                ; loop while no key pressed
                 lda kbd                                 ; get kes value
-                rts
-
-copymaintoaux           ; copy program to AUX memory
-                lda #>start
-                sta $3d         ; source high
-                sta $43         ; dest high
-                lda #<start      
-                sta $3c         ; source low
-                sta $42         ; dest low
-                lda #>prgend    ; source end low
-                sta $3f 
-                lda #<prgend    ; source end high
-                sta $3e
-                sec             ; main to aux
-                jsr AUXMOV      ; move
                 rts
 
 GetCharVal      
@@ -2559,10 +2548,13 @@ error       brk                     ; display en error message here
             rts
 tfont       str 'TEST.FONT'
             dfb 0
+workfont    asc 'WORK'
+testfont    asc 'TEST'
+
 
 openparam   dfb 3
             dw path
-            dw $2000                ; ATTENTION !!!!!
+            dw $8E00                ; ATTENTION !!!!!
 refnum      ds 1
 
 readparam
@@ -2628,5 +2620,63 @@ onlinep    hex 02
 unit      ds 1
           da path
 
+LoadFont
+            jsr DoPrefix            ; set prefix in path var (strating and ending with /) 
+
+            ldx #3
+            lda LoadFlag
+            beq workl
+
+            
+testl       lda workfont,x 
+            sta tfont+1,x 
+            dex  
+            bpl testl
+            jmp LoadStart
+
+workl       lda testfont,x 
+            sta tfont+1,x 
+            dex  
+            bpl workl
+
+LoadStart
+            ldy #0                  ; add file name string to prefix
+            ldx path                ; get prefix length
+:1          inx                     ; set x index to next position in prefix
+            lda tfont+1,y           ; read char in file name string
+            beq DoOpen              ; if value = 0 : exit loop
+            sta path,x              ; store char at the end of prefix string
+            iny                     ; next char
+            jmp :1                  ; loop
+
+DoOpen                              ; adjust prefix length
+            lda path                ; by adding file name length
+            clc
+            adc tfont               ; file name length
+            sta path
+
+            jsr MLI                 ; open file 
+            dfb open
+            da openparam
+            bcc DoLoad
+            jmp error
+DoLoad                              ; load it in memory
+            lda refnum              ; copy ref num of open file for next MLI calls
+            sta refnum2 
+            sta refnum3
+
+            jsr MLI
+            dfb read
+            da readparam
+            bcc CloseFile
+            jmp error
+
+CloseFile                           ; and close file
+            jsr MLI
+            dfb close
+            da closeparam
+            rts
+
+LoadFlag    ds 1
 
 prgend  equ *
