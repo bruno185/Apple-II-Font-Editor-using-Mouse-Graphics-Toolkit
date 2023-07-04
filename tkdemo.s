@@ -35,14 +35,13 @@ InThumb         equ 5
 UseInterrupts   equ 0 ; Yes
 
 start       equ *
-
-
             ;Main2Aux start;prgend
-            Main2Aux SystemFont;SystemFontE     ; save original font data to AUX
-            lda #0
+    
+            lda #0                              ; set flag to 0 to load original/default font
             sta LoadFlag
-            jsr LoadFont
-
+            jsr LoadFont                        ; load font to $8800
+            Main2Aux SystemFont;SystemFontE     ; save original font data to AUX
+;
 ; set up the desk top
 ;
             lda #0
@@ -226,10 +225,12 @@ DrawIt_3    cmp TestWindow                  ; unused now !!
 DrawIt_4    cmp DialogWindow
             bne DrawIt_5
             jmp DrawWin5
-
-DrawIt_5    jsr RingBell
+DrawIt_5    cmp AlertWindow
+            bne DrawIt_6
+            jmp DrawWin6
+DrawIt_6
+            jsr RingBell
             rts ; Should never get here!
-;
 ;
 DrawWin1    equ *                              ; SampleWindow
             TK_call MoveTo;lazypt
@@ -482,193 +483,30 @@ TextData    dw CurChar                      ; char var : pointer to char(s) to d
             dfb 1                           ; length of string to draw
 CurChar     dfb 0                           ; char value var
 ;
+
+DrawWin6
+            
+            TK_call MoveTo;AlertPt1 
+            TK_call DrawText;fontloaded
+            TK_call MoveTo;AlertPt2 
+            TK_call DrawText;MsgClic 
+
+getev       TK_call GetEvent;TheEvent
+            lda EvtType
+            beq getev
+            TK_call CloseWindow;AlertWindow
+            rts
+
+AlertPt1    dw 75,11
+AlertPt2    dw 40,22
+fontloaded  da fload+1
+fload       str 'Working font loaded !' 
+MsgClic     da msgc+1
+msgc        str '-- click the mouse or press a key --'
 ;
 DrawWin4    equ *                            ; "TestWindow"
-                                            ; display all the parameters of this window
-            lda #10                         ; init W4FirstPoint to postion 10,10 
-                                            ; high byte of each integer is allways 0
-            sta W4FirstPoint
-            sta W4FirstPoint+2
-            TK_call MoveTo;W4FirstPoint     ; set pen position to W4FirstPoint
-;
-            TK_call DrawText;W4_L1          ; draw label "Window ID:"
-            lda TestWindow                  ; window ID in A, to be drawn
-            jsr ByteOut                     ; draw window ID value in hex representation
-            jsr NewLine                     ; add 8 to y value of W4FirstPoint and move pen to this position
-;
-            TK_call DrawText;W4_L2          ; same with "Option Byte"
-            lda TestWindow+1
-            jsr ByteOut                     ; draw value in hex representation
-            jsr NewLine
-;
-            TK_call DrawText;W4_L3          ; "Window Title"
-                                            ; TestWindow+2/+3 : pointer to str (with length in fist byte)
-            lda TestWindow+2                ; copy string pointer to var TempText
-            sta TempText
-            sta K1                          ; and to K1 var, in ZP
-            lda TestWindow+3
-            sta TempText+1
-            sta K1+1
-            ldy #0
-            lda (K1),y                      ; get sting length byte 
-            sta TempText+2                  ; poke length in third byte of parameter 
-            inc TempText                    ; inc pointer to string, to skip mength byte
-            bne *+5
-            inc TempText+1
-            TK_call DrawText;TempText       ; display string
-            jsr NewLine                     ; increments W4FirstPoint move pen position      
-;
-            TK_call DrawText;W4_L4          ; "Control Options (H,V)" (2 bytes)
-            lda TestWindow+4                ; get 1st value 
-            jsr ByteOut                     ; draw value in hex representation 
-            jsr Comma                       ; draw a comme
-            lda TestWindow+5                ; get 2nd value 
-            jsr ByteOut                     ; draw it 
-            jsr NewLine
-;   
-            TK_call DrawText;W4_L5          ; "H Thumb Max & Pos"
-            lda TestWindow+6
-            jsr ByteOut
-            jsr Comma
-            lda TestWindow+7
-            jsr ByteOut
-            jsr NewLine
-;
-            TK_call DrawText;W4_L6          ; V Thumb Max & Pos
-            lda TestWindow+8
-            jsr ByteOut
-            jsr Comma
-            lda TestWindow+9
-            jsr ByteOut
-            jsr NewLine
-;
-            TK_call DrawText;W4_L7          ; "Window Status"
-            lda TestWindow+10
-            jsr ByteOut
-            jsr NewLine
-;
-            TK_call DrawText;W4_L8          ; "Reserved"
-            lda TestWindow+11
-            jsr ByteOut
-            jsr NewLine
-;
-            TK_call DrawText;W4_L9          ; "H & V Minimums"
-            lda TestWindow+12
-            ldx TestWindow+13
-            jsr WordOut                     ; Displays the word in X,A as hex 
-            jsr Comma
-            lda TestWindow+14
-            ldx TestWindow+15
-            jsr WordOut
-            jsr NewLine
-;
-            TK_call DrawText;W4_L10         ; "H & V Maximums"
-            lda TestWindow+16
-            ldx TestWindow+17
-            jsr WordOut
-            jsr Comma
-            lda TestWindow+18
-            ldx TestWindow+19
-            jsr WordOut
-            jsr NewLine
-;
-            TK_call DrawText;W4_L11         ; "Window Graf Port--"
-            jsr NewLine
-            lda #50                         ; indent 50 pixels
-            jsr Tab                         ; Increments the X cooridinate of W4FirstPoint by A-reg 
-                                            ; all next lines will be indented
-;
-            TK_call DrawText;W4_L12         ; "View Loc"
-            lda TestWindow+20
-            ldx TestWindow+21
-            jsr WordOut
-            jsr Comma
-            lda TestWindow+22
-            ldx TestWindow+23
-            jsr WordOut
-            jsr NewLine
-;
-            TK_call DrawText;W4_L13         ; "Map Loc & Width"
-            lda TestWindow+24
-            ldx TestWindow+25
-            jsr WordOut
-            jsr Comma
-            lda TestWindow+26
-            ldx TestWindow+27
-            jsr WordOut
-            jsr NewLine
-;
-            TK_call DrawText;W4_L14         ; "Clip Rect"
-            lda TestWindow+28
-            ldx TestWindow+29
-            jsr WordOut
-            jsr Comma
-            lda TestWindow+30
-            ldx TestWindow+31
-            jsr WordOut
-            jsr Comma
-            lda TestWindow+32
-            ldx TestWindow+33
-            jsr WordOut
-            jsr Comma
-            lda TestWindow+34
-            ldx TestWindow+35
-            jsr WordOut
-            jsr NewLine
-;
-            TK_call DrawText;W4_L15 ; Pattern
-            ; Pattern : 8 bytes 
-            lda #0                          ; init counter
-            sta K1                          ; in K1 var
-W4_1        ldx K1
-            lda TestWindow+36,X             ; get value
-            jsr ByteOut                     ; draw it in hex
-            jsr Comma                       ; draw a comma
-            inc K1
-            lda K1                          ; next byte
-            cmp #8                          ; < 8 ?
-                                            ; Error : should be cmp #7 !!
-                                            ; 9 values are printed instead of 8
-            bcc W4_1                        ; yes : loop
-            ldx K1                          ; no
-            lda TestWindow+36,X             ; draw last value
-            jsr ByteOut                     ; without comma
-            jsr NewLine
-;
-            TK_call DrawText;W4_L16         ; "Pen Location"
-            lda TestWindow+46
-            ldx TestWindow+47
-            jsr WordOut
-            jsr Comma
-            lda TestWindow+48
-            ldx TestWindow+49
-            jsr WordOut
-            jsr NewLine
-;
-            TK_call DrawText;W4_L17         ; "Pen Size"
-            lda TestWindow+50
-            jsr ByteOut
-            jsr Comma
-            lda TestWindow+51
-            jsr ByteOut
-            jsr NewLine
-;
-            TK_call DrawText;W4_L18         ; "Pen Mode"
-            lda TestWindow+52
-            jsr ByteOut
-            jsr NewLine
-;
-            TK_call DrawText;W4_L19         ; "TextBG"
-            lda TestWindow+53
-            jsr ByteOut
-            jsr NewLine
-;
-            TK_call DrawText;W4_L20         ; "Font Address"
-            lda TestWindow+54
-            ldx TestWindow+55
-            jsr WordOut
-            jsr NewLine
             rts
+
 WordOut equ *                   ; Displays the word in X,A as hex at current pen loc
                                 ; High byte is in X, Low byte is in A.
             pha ; save low byte
@@ -928,37 +766,22 @@ HM_1
             cmp #1 ; find out which menu
             ; first menu (Apple menu) ID = 1 
             bne Menu_1
-            jsr h_menu_1        ; Handle Apple menu
+            jsr h_menu_1        ; Apple menu
             jmp Menu_Done
 ;
 Menu_1      cmp #2
             bne Menu_2
-            jsr h_menu_2        ; Handle File menu
+            jsr h_menu_2        ; File menu
             jmp Menu_Done
 ;
 Menu_2      cmp #3
             bne Menu_3
-            jsr h_menu_3        ; Handle Edit menu
+            jsr h_menu_3        ; Edit menu
             jmp Menu_Done
 ;
 Menu_3 cmp #4
-            bne Menu_4
-            jsr h_menu_4        ; Handle Window menu
-            jmp Menu_Done
-;
-Menu_4      cmp #5
-            bne Menu_5
-            jsr h_menu_5        ; Handle Menu Test menu
-            jmp Menu_Done
-;
-Menu_5      cmp #6
-            bne Menu_6
-            jsr h_menu_6        ; Handle Window Test menu
-            jmp Menu_Done
-;
-Menu_6      cmp #7
             bne Menu_7
-            jsr h_menu_7        ; Handle Dummy menu
+            jsr h_menu_4        ; Font menu
             jmp Menu_Done
 ;
 Menu_7      jsr RingBell        ; should never get here
@@ -1010,6 +833,9 @@ M2_3        cmp #1
             lda #1
             sta LoadFlag
             jsr LoadFont
+            TK_call OpenWindow;AlertWindow 
+            lda AlertWindow
+            jsr DrawItB  
             rts
 
 M2_4        rts
@@ -1164,227 +990,7 @@ UncheckParms dfb 4 ; Menu ID
             dfb 0 ; Item Number
             dfb 0 ; Uncheck It (vs check it)
 ;
-h_menu_5 equ *                                  ; Menu Test
-            lda MenuItem
-            bne m5_1
-            rts
-m5_1        cmp #1 ; Clear Menu
-            bne m5_2
-            jmp ClearMenu
-m5_2        cmp #2 ; Disable Menu
-            bne m5_3
-            jmp DisMenu
-m5_3        cmp #3 ; Enable Menu
-            bne m5_4
-            jmp EnMenu
-m5_4        cmp #4 ; Disable Items
-            bne m5_5
-            jmp DisItems
-m5_5        cmp #5 ; Enable Items
-            bne m5_6
-            jmp EnItems
-m5_6        cmp #6 ; CheckItems
-            bne m5_7
-            jmp CkItems
-m5_7        cmp #7 ; UncheckItems
-            bne m5_8
-            jmp UnckItems
-m5_8        cmp #8 ; Change Marks
-            bne m5_9
-            jmp ChangeMarks
-m5_9        cmp #9 ; Restore marks
-            bne m5_10
-            jmp RestoreMarks
-m5_10       rts
-;
-ClearMenu   equ *
-            jsr EnMenu                  ; enable menu 7
-            jsr EnItems                 ; enable some items
-            jsr RestoreMarks
-            jmp UnckItems
-;
-DisMenu     equ *
-            TK_call DisableMenu;DisParms
-            ; Disables or enables selection and highlighting of an entire menu.
-            ; Parameters :
-                ; menu_ld (input) byte ID of the menu to be disabled
-                ; disable (input) byte 0: enable the menu ; 1: disable the menu
-            rts
-DisParms    dfb 7,1                     ; disable menu 7
-;
-EnMenu      equ *
-            TK_call DisableMenu;EnParms
-            ; Disables or enables selection and highlighting of an entire menu.
-            ; Parameters :
-                ; menu_ld (input) byte ID of the menu to be disabled
-                ; disable (input) byte 0: enable the menu ; 1: disable the menu            
-            rts
-EnParms     dfb 7,0                     ; enable menu 7
-;
-DisItems    equ *
-            ldx #1                      ; to disable items (to store in disable byte param.)
-            jmp DisEnItems
-;
-EnItems     equ *
-            ldx #0                      ; to enable items (to store in disable byte param.)
-            jmp DisEnItems
-;
-DisEnItems  equ *
-            lda #3                      ; item 3 to be disabled
-            jsr DisIt                   ; disable iy
-            lda #5                      ; item 5 to be disabled
-            jsr DisIt                   ; disable iy
-            lda #7                      ; item 7 to be disabled
-            jmp DisIt                   ; disable iy
-;
-DisIt       equ *
-            stx DisItParms+2            ; store disable byte in parameters  
-            sta DisItParms+1            ; store menu item in parameters  
-            TK_call DisableItem;DisItParms
-            ; Disables or enables selection and highlighting of a single menu item.
-            ; Parameters :
-                ; menu_id (input) byte ID of the menu containing the item to be disabled.
-                ; menu_ltem (input) byte number of the item to be disabled,
-                ; disable (input) byte 0: enable the menu item ; 1: disable the menu item
-            ldx DisItParms+2
-            rts
-DisItParms  dfb 7,0,0                   ; modoifed by code above
-;
-CkItems equ *
-            ldx #1                      ; set check parameter for CheckItem call (1 : display the checkmark)
-            jmp CkUnckItems
-;
-UnckItems equ *
-            ldx #0                      ; set check parameter for CheckItem call (0 : erase the checkmark)
-            jmp CkUnckItems
-;
-CkUnckItems equ *
-            lda #1                      ; set menu item parameter for CheckItem call (item 1)
-            jsr CkIt
-            lda #4                      ; set menu item parameter for CheckItem call (item 4)
-            jsr CkIt
-            lda #8                      ; set menu item parameter for CheckItem call (item )
-            jsr CkIt
-            lda #9                      ; set menu item parameter for CheckItem call (item 1)
-            jmp CkIt
-;
-CkIt equ *
-            stx CkItParms+2                     ; set check parameter 
-            sta CkItParms+1                     ; set menu item
-            TK_call CheckItem;CkItParms
-            ; CheckItem : Displays or removes a checkmark next to a menu Item.
-            ; Parameters :
-                ; menu_id (input) byte ID of the menu containing the item
-                ; menu_item (input) byte number of the item to be checked
-                ; check (input) :
-                    ; byte 0: erase the checkmark
-                    ; byte 1: display the checkmark
-            ldx CkItParms+2
-            rts
-CkItParms   dfb 7,0,0                           ; parameter : menu id 7, menu item and check parameters 
-                                                ; are set by program (above).
-;
-ChangeMarks equ *
-            ; change some menu items checkmarks.
-            TK_call SetMark;Mark8
-            ; Sets the character used for the checkmark for a specific menu item.
-            ; Parameters :
-                ; menu_ld (input) byte ID of the menu containing the item
-                ; item_num (input) byte number of the item to be changed
-                ; set_char (input) byte 0: use the standard checkmark ; 1: set the checkmark to mark_char
-                ; mark_char (input) byte ascii value of the character to use as the checkmark for this item
-            TK_call SetMark;Mark9
-            ; same, with different checkmark chars.
-            rts
-Mark8       dfb 7,8,1,'#'                       ; menu 7, item 8, use defined char, # = mark char.
-Mark9       dfb 7,9,1,'*'                       ; menu 7, item 9, use defined char, * = mark char.
-RestoreMarks equ *
-            ; restore menu items checkmarks by dafault.
-            TK_call SetMark;Unmark8
-            ; Sets the character used for the checkmark for a specific menu item.
-            TK_call SetMark;Unmark9
-            ; Sets the character used for the checkmark for a specific menu item.
-            rts
-Unmark8     dfb 7,8,0,0                         ; menu 7, item 8, use standard char, 0 (could be any value)
-Unmark9     dfb 7,9,0,0                         ; menu 7, item 9, use standard char, 0 (could be any value)
-;
-h_menu_6    equ *                               ; menu "Window Test" 
-            lda MenuItem
-            cmp #1                              ; 1st item = "Open Test Window"
-            bne M6_2
-M6_1        TK_call OpenWindow;TestWindow
-            ; Initializes a window and brings it to the front of the desktop.
-            ; Parameters :
-                ; a_winfo (input) winfo for the window to initialize
 
-            lda TestWindow                      ; get TestWindow ID
-            jmp DrawItB                         ; draw content and exit 
-
-M6_2        cmp #11                             ; there are 10 item in this menu
-            bcc *+5                             ; if menu item not < 11 then rts
-            jmp M6_11
-            TK_call CloseWindow;TestWindow      ; if item > 1 and < 11 then close TestWindow
-            ; CloseWindow : removes a window from the desktop (generate update events)
-            jsr ClearUpdates                    ; process any update event
-            lda MenuItem
-            cmp #2                              ; if menu item = 2 ("Dialog")
-            bne M6_3
-            lda TestWindow+1                    ; then force bit in window window option byte to make it a Dialog box
-            eor #%00000001 ; Dialog Box
-            sta TestWindow+1
-            jmp M6_1                            ; and reopen TestWindow, draw it and rts (see above)
-M6_3        cmp #3                              ; if if menu item = 3 ("Go Away Present")
-            bne M6_4
-            lda TestWindow+1                    ; then force bit in winfow window option byte to make a close box 
-            eor #%00000010 ; Go Away Box
-            sta TestWindow+1
-            jmp M6_12                           ; and update checkmark, reopen TestWindow, draw it and rts (see above)
-M6_4        cmp #4                              ; same with "H-Scroll Present"
-            bne M6_5
-            lda TestWindow+4
-            eor #%10000000 ; H Scroll Bar Present
-            sta TestWindow+4
-            jmp M6_12
-M6_5        cmp #5                              ; same with "V-Scroll Present"
-            bne M6_6
-            lda TestWindow+5
-            eor #%10000000 ; V Scroll Bar Present
-            sta TestWindow+5
-            jmp M6_12
-M6_6        cmp #6                              ; same with "H-Thumb Present"
-            bne M6_7
-            lda TestWindow+4
-            eor #%01000000 ; H Thumb Present
-            sta TestWindow+4
-            jmp M6_12
-M6_7        cmp #7                              ; same with "V-Thumb Present"
-            bne M6_8
-            lda TestWindow+5
-            eor #%01000000 ; V Thumb Present
-            sta TestWindow+5
-            jmp M6_12
-M6_8        cmp #8                              ; same with "H-Scroll Active"
-            bne M6_9
-            lda TestWindow+4
-            eor #%00000001 ; H Scroll Active
-            sta TestWindow+4
-            jmp M6_12
-M6_9        cmp #9                              ; same with "V-Scroll Active"
-            bne M6_10
-            lda TestWindow+5
-            eor #%00000001 ; V Scroll Active
-            sta TestWindow+5
-            jmp M6_12
-M6_10       cmp #10                              ; same with "Grow Box Present"
-            bne M6_11
-            lda TestWindow+1
-            eor #%00000100 ; Grow Box Present
-            sta TestWindow+1
-            jmp M6_12
-M6_11       rts
-
-M6_12       jsr SetChecks                       ; update checkmarks
-            jmp M6_1                            ; jump back to reopen TestWindow and draw its content.
 
 SetChecks   equ *
 ; check all bits from window window option byte
@@ -1650,11 +1256,10 @@ outEditBox
             TK_call SetPattern;White
             TK_call PaintRect;refresh_r
             TK_call PaintRect;refresh_r
-            TK_call PaintRect;refresh_r
-            TK_call PaintRect;refresh_r
-            TK_call PaintRect;refresh_r
+            ;TK_call PaintRect;refresh_r
+            ;TK_call PaintRect;refresh_r
+            ;TK_call PaintRect;refresh_r
 
-            ;TK_call SetPattern;Black
             TK_call SetPenMode;pencopy
             jmp DrawWin2
 outRefr     
@@ -1717,7 +1322,7 @@ getByte     lda $FFFF                               ; get bye in font data
                                                     ; Adjust aRect position
                                                     ; to make it match the clicked square
             ldx SquareX
-DoRectX     cpx #0                                  ; shift rect right SquareX times
+DoRectX     ;cpx #0                                  ; shift rect right SquareX times
             beq DoRectY
             jsr ShitRectR
             dex 
@@ -2058,7 +1663,9 @@ TheDesk     dfb $06,$EA ;machine ID
 InterruptFlag dfb UseInterrupts ; no interupts
             dw SystemFont                           ; memory location of font
             dw SaveBuffer                           ; location of buffer for saving screen data
-            dw 4000 ; save area size
+            ; dw 4000 ; save area size
+            dw 1024 ; save area size                ; saving memory ???
+            * To be tested : move SaveBuffer to 9200 (to 9500), to free A000 to AFFF
 
 ;
 ; Menu Initialization Stuff
@@ -2241,6 +1848,29 @@ DialogWindow dfb 5,%00000001 ; Dialog Box
             dw 150,30 ;window port
             dw $2000,$80
             dw 0,0,260,100
+            ds 8,$FF
+            dfb $FF,0 ; and & or masks
+            dw 0,0
+            dfb 1,1
+            dfb 0,$7F
+            dw SystemFont
+;
+            dw 0 ;link to next window
+
+
+AlertWindow dfb 6,%00000001                         ; Alert Box
+            dw 0                                    ; no title
+            dfb 0,0 ;ctrl options
+            dfb 0,0 ; H-ThumbMax and H-Thumb Pos
+            dfb 0,0 ; V-ThumbMax and V-Thumb Pos
+            dfb 0,0 ; Window Option Byte and Reserved
+;
+            dw 100,100
+            dw 500,180
+;
+            dw 150,30 ;window port
+            dw $2000,$80
+            dw 0,0,260,25                           ; size ?
             ds 8,$FF
             dfb $FF,0 ; and & or masks
             dw 0,0
@@ -2464,9 +2094,9 @@ AppleItem1 str 'About this demo...'
 ;
 FileItem1 str 'Enter Monitor'
 FileItem2 str 'Quit'
-FileItemLoad str 'Load font'
-FileItemSave str 'Save font'
-FileItemReset str 'Reset font'
+FileItemLoad str 'Load working font'
+FileItemSave str 'Save working font'
+FileItemReset str 'Reset default font'
 ;
 EditItem1 str 'Undo'
 EditItem2 str 'Cut'
@@ -2476,9 +2106,9 @@ EditItem5 str 'Clear'
 EditItem6 str 'Select All'
 EditItem7 str 'Show Clipboard'
 ;
-WindowItem1 str 'Sample '
+WindowItem1 str 'Sample text'
 WindowItem2 str 'Edit Font'
-WindowItem3 str 'Display Font'
+WindowItem3 str 'Display Font '
 WindowItem5 str 'Drag'
 WindowItem6 str 'Grow'
 WindowItem7 str 'Hide'
@@ -2569,42 +2199,41 @@ closeparam
 refnum3     ds 1
 
 DoPrefix
-          jsr MLI           ; Fetprefix, prefix ==> "path"
+          jsr MLI                   ; Setprefix call, prefix ==> "path"
           hex c7
           da prefix
           bcc suitegp
           jsr error
           bra men
 suitegp
-          lda path          ; get prefix length
-          beq noprefix      ; length = 0 : prefix not set
-          jmp goodpfx       ; > 0 prefix is already set : rts
-
+          lda path                  ; get prefix length
+          beq noprefix              ; length = 0 : prefix not set
+          jmp goodpfx               ; > 0 prefix is already set : rts
 noprefix
-          lda devnum        ; last used slot/drive 
-          sta unit          ; param of online MLI call
+          lda devnum                ; last used slot/drive 
+          sta unit                  ; param of online MLI call
 men       jsr MLI
-          hex c5            ; on_line call : get prefix in path var
+          hex c5                    ; on_line call : get prefix in path var
           da onlinep
           bcc suite
           jsr error
-          bra men        ; loop if error l'erreur (user need to put good floppy in drive)
+          bra men                   ; loop if error l'erreur (user need to put good floppy in drive)
 suite     lda path
-          and #$0f       ; length in low nibble
+          and #$0f                  ; length in low nibble
           sta path
           tax
 l1        lda path,x
-          sta path+1,x   ; shift 1 byte
+          sta path+1,x              ; shift 1 byte
           dex
           bne l1
           inc path
-          inc path       ; long = long + 2  for starting and ending /
+          inc path                  ; long = long + 2  for starting and ending /
           ldx path
           lda #$af
-          sta path,x     ; / at the end of prefix
-          sta path+1     ; / at the beginning of prefix
+          sta path,x                ; / at the end of prefix
+          sta path+1                ; / at the beginning of prefix
 
-          jsr MLI        ; set_prefix
+          jsr MLI                   ; set_prefix
           hex c6
           da prefix
           bcc goodpfx
@@ -2616,7 +2245,7 @@ prefix    hex 01
 
 path      ds 256
 
-onlinep    hex 02
+onlinep   hex 02
 unit      ds 1
           da path
 
@@ -2624,17 +2253,17 @@ LoadFont
             jsr DoPrefix            ; set prefix in path var (strating and ending with /) 
 
             ldx #3
-            lda LoadFlag
+            lda LoadFlag            ; test LoadFlag
             beq workl
 
             
-testl       lda workfont,x 
+testl       lda workfont,x          ; LoadFlag <> 0  : set 'WORK.TEST' as file name
             sta tfont+1,x 
             dex  
             bpl testl
             jmp LoadStart
 
-workl       lda testfont,x 
+workl       lda testfont,x          ; LoadFlag = 0  : set 'TEST.TEST' as file name (default font)
             sta tfont+1,x 
             dex  
             bpl workl

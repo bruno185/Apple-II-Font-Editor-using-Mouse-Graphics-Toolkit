@@ -1,6 +1,6 @@
 
 
-800     2000        program
+800     2000        program (max = 6144 bytes)
 
 2000    3FFF        display
 
@@ -8,6 +8,8 @@
 
 8800    8D03        font
 
-8E00    9FFF        FREE !!!
+8E00    91FF        MLI open call buffer
+
+9200    9FFF        FREE !!!
 
 A000    AFA0        SaveBuffer
