@@ -242,24 +242,24 @@ DrawIt equ * ; Refresh window whose id is passed in A-Reg
             ; Otherwise, DrawIt follows DrawItB, which set the right port.
             cmp SampleWindow
             bne DrawIt_1
-            jmp DrawWin1
+            jmp DrawWin1                    ; draw Sample Window
 DrawIt_1    cmp EditFontW
             bne DrawIt_2
-            jmp DrawWin2
+            jmp DrawWin2                    ; draw Edit Window
 DrawIt_2    cmp CharsWindow
             bne DrawIt_3
-            jmp DrawWin3
+            jmp DrawWin3                    ; draw display font Window
 DrawIt_3    cmp TestWindow                  ; unused now !!
             bne DrawIt_4
-            jmp DrawWin4
+            jmp DrawWin4                    ; rts (not implemented)
 DrawIt_4    cmp DialogWindow
             bne DrawIt_5
-            jmp DrawWin5
+            jmp DrawWin5                    ; draw About dialog window
 DrawIt_5    cmp AlertWindow
             bne DrawIt_6
-            jmp DrawWin6
+            jmp DrawWin6                    ; draw Alert window 
 DrawIt_6    cmp MessageBox
-            bne DrawIt_7
+            bne DrawIt_7                    ; draw message  Yes/No window                   
             jmp DrawWin7
 DrawIt_7    jsr RingBell
             rts ; Should never get here!
@@ -294,9 +294,9 @@ DrawWin2 equ *                                  ; EditFontW
 ShowChar
             ldx DispChar                        ; get ascii value of char to display
             jsr GetCharVal                      ; get all 9 bytes of this char in MyChar array
-            jsr InitBitBox                      ; set bitmaps view loc top left = BasePoint
-            ldx #00 
-            stx row 
+            jsr InitRect                        ; set bitmaps view loc top left = BasePoint
+            ldx #00                             ; init rom counter 
+            stx row
 
 ShowChar_1  lda MyChar,x                        ; get a byte of the char in var TheChar
             sta TheChar                         ; save it in a var
@@ -305,24 +305,24 @@ ShowChar_1  lda MyChar,x                        ; get a byte of the char in var 
 ShowChar_2  
             lsr TheChar                         ; get a bit from TheChar
             bcc ShowChar_3                      ; bit = 0 : paint a white rectangle
-            ;TK_call PaintBits;BlackBits
+
             jsr MakeRect                        ; set up aRect var
             jsr InsetRect                       ; make it smaller 1 pixel
             TK_call PaintRect;aRect             ; paint it black 
 
 ShowChar_3  dec col 
             beq nextline                        ; 7 lsr ?
-            jsr MoveBitsX                       ; no : move view loc of bitmaps 18 pixels right
+            jsr MoveRectX                       ; no : move view loc of bitmaps 18 pixels right
             jmp ShowChar_2                      ; loop 
 nextline    
-            jsr IntiBitBoxX                     ; new line of bitmaps
+            jsr IntiRectX                       ; new line of bitmaps
                                                 ; set box.x to BasePoint.x
-            jsr MoveBitsY                       ; move bitmaps down 
+            jsr MoveRectY                       ; move bitmaps down 
             ldy #7                              ; re-init lsr counter
             sty col
             inc row                             ; next line
             ldx row
-            cpx #9
+            cpx #9                              ; all 9 lines done ?
             bne ShowChar_1
 
             TK_call FrameRect;edit_r            ; show bounding box
@@ -335,31 +335,31 @@ nextline
             rts
 
 MakeRect                                    ; Set up aRect var 
-                                            ; top.left coner : same as BlackBits view loc
+                                            ; top.left coner : same as aRectTopLeft view loc
                                             ; bottom.down.x = top.left.x + gapx ; bottom.down.y = top.left.y + gapy 
-            lda BlackBits                   ; top.left.x
+            lda aRectTopLeft                   ; top.left.x
             sta aRect
-            lda BlackBits+1
+            lda aRectTopLeft+1
             sta aRect+1
             
-            lda BlackBits+2                 ; top.left.y
+            lda aRectTopLeft+2                 ; top.left.y
             sta aRect+2
-            lda BlackBits+3
+            lda aRectTopLeft+3
             sta aRect+3  
 
-            lda BlackBits                   ; bottom.down.x
+            lda aRectTopLeft                   ; bottom.down.x
             clc
             adc #gapx
             sta aRect+4
-            lda BlackBits+1
+            lda aRectTopLeft+1
             adc #00
             sta aRect+5
 
-            lda BlackBits+2                 ; bottom.down.y
+            lda aRectTopLeft+2                 ; bottom.down.y
             clc
             adc #gapy
             sta aRect+6
-            lda BlackBits+3
+            lda aRectTopLeft+3
             adc #00
             sta aRect+7
             rts
@@ -390,44 +390,44 @@ InsetRect                                   ; make aRect 1 pixel smaller in all 
 :33         dec aRect+6
 
             rts
-;
+; 
 gapx        equ 18
 gapy        equ 10
-InitBitBox                                      ; copy data fom BasePoint
-                                                ; to BlackBits view loc
+InitRect                                        ; copy data fom BasePoint
+                                                ; to aRectTopLeft view loc
             ldx #00                             ; top.left.x
 :1          lda BasePoint,x                     
-            sta BlackBits,x        
+            sta aRectTopLeft,x        
             inx 
             cpx #4
             bne :1
             rts 
 
-MoveBitsX   lda BlackBits                       ; x
+MoveRectX   lda aRectTopLeft                    ; x
             clc
             adc #gapx                           ; add 18 + 2 (for space between blocs) 
-            sta BlackBits
-            lda BlackBits+1
+            sta aRectTopLeft
+            lda aRectTopLeft+1
             adc #0
-            sta BlackBits+1
+            sta aRectTopLeft+1
             rts
 
-MoveBitsY                                       ; move bitmap view loc 10 pix down
-            lda BlackBits+2                     ; move top.left corner down 10 pixels
+MoveRectY                                       ; move bitmap view loc 10 pix down
+            lda aRectTopLeft+2                  ; move top.left corner down 10 pixels
             clc 
             adc #gapy                           ; add 10 + 1 (for space between blocs)  
-            sta BlackBits+2
-            lda BlackBits+3
+            sta aRectTopLeft+2
+            lda aRectTopLeft+3
             adc #00
-            sta BlackBits+3          
+            sta aRectTopLeft+3          
             rts
 
-IntiBitBoxX                                     ; set box.x to BasePoint.x
-            ldx #00                             ; 
+IntiRectX                                      ; copy BasePoint.x to aRectTopLeft.x
+            ldx #00
 :1          lda BasePoint,x                     
-            sta BlackBits,x         
+            sta aRectTopLeft,x         
             inx 
-            cpx #2
+            cpx #2                              ; x : 16 bit integer
             bne :1 
             rts  
 
@@ -436,23 +436,18 @@ BasePoint   dw 10,30
 aRect       dw 10,30,70,50
 row         ds 1
 col         ds 1
-Black       dfb 0,0,0,0,0,0,0,0,0                   ; black pattern
-White       ds 8,$FF                                ; white pattern
+Black       dfb 0,0,0,0,0,0,0,0,0               ; black pattern
+White       ds 8,$FF                            ; white pattern
 
-BlackBits   dw 50,50                                ; view location on current port
-            dw data1bits                             ; bitmap pointer
-            dw 3                                    ; width of bitmap 
-            dw 0,0,17,9                             ; clip rectangle
-data1bits   dfb $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00     ; bitmap data
-            dfb $00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00,$00
-            dfb $00,$00,$00,$00,$00,$00
+aRectTopLeft dw 50,50                           ; view location on current port
 
-MyPoint     dw 10,10                         ; pen position var
+
+MyPoint     dw 10,10                            ; pen position var
 MyText      dw MyTextData
-            dfb 14                          ; length of string to draw
+            dfb 14                              ; length of string to draw
 MyTextData  asc 'Character : '
 DispChar    asc 'B'
-            asc ' '                         ; to erase previous wider char
+            asc ' '                             ; to erase previous wider char
 ;
 ;
 DeltaX      equ 10
@@ -533,10 +528,10 @@ fontloaded  da fload+1
 fload       str 'Working font loaded !' 
 MsgClic     da msgc+1
 msgc        str '-- click the mouse or press a key --'
-
-
+*
+*
 DrawWin7
-            ; display MessageBox
+            ; display MessageBox content
             TK_call SetPenMode;pencopy
             TK_call SetPattern;Black  
             TK_call MoveTo;MsgPt1
@@ -1449,7 +1444,7 @@ getByte     lda $FFFF                               ; get bye in font data
             
                                                     ; Prepare color inversion of square (black <-> white)
                                                     ; by setting coordinate of square to paint
-            jsr InitBitBox                          ; init. aRect coordinates
+            jsr InitRect                            ; init. aRect coordinates
             jsr MakeRect                            ; make a rect
 
                                                     ; Adjust aRect position
