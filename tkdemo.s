@@ -37,7 +37,7 @@ UseInterrupts   equ 0 ; Yes
 start       equ *
             ;Main2Aux start;prgend
     
-            lda #0                              ; set flag to 0 to load original/default font
+            lda #0                              ; set flag to 0 to load original system font
             sta LoadFlag
             jsr LoadFont                        ; load font to $8800
             Main2Aux SystemFont;SystemFontE     ; save original font data to AUX
@@ -103,11 +103,6 @@ start       equ *
             ; check all bits from window window option byte.
             ; and set checkmark to the corresponding menu item if bit is set to 1.
 
-; * = $820
-* TEST
-            ;jsr test_getbuffer
-* /TEST
- 
 ********************************************
 *
 * This is the start of the Main Loop
@@ -128,14 +123,50 @@ Demo_1_1 equ *
             ; Returns the next event from the event queue
             ; Parameters :
                 ; event (output) type_event (= event record)
-;
+* Event record : 
+        ; evt_kind : byte;
+        ; bytel
+        ; byte2
+        ; byte3
+        ; byte4
+; 
+    ; evt_kind : the event type, which is one of the following:
+            ; no_event = 0;
+            ; button_down = 1;
+            ; button_up = 2;
+            ; key_down = 3;
+            ; drag = 4;
+            ; apple_key = 5;
+            ; update_event = 6;
+    *
+    ; Event types 7.. 127 are reserved for standard eventa which may be
+    ; added in future versions of the Tool Kit. The user may define his
+    ; own event types In the range 128..255 and poat these to the event
+    ; queue.
+    ; "Bytel, byte2, byte3, and byte4" contain information according to
+    ; the event type:
+    ; 
+        ; for no_event, button_down, button__up, drag, and apple_key events:
+                ; bytel and byte2 are the low-order and high-order bytes,
+                ; respectively, of the x-posltion of the mouse in mouse or
+                ; desktop coordinates.
+                ; byte3 and byte4 are the low-order and high-order bytes,
+                ; respectively, of the y-position of the mouse in mouse or
+                ; desktop coordinates.
+        ; for key__down events:
+                ; bytel Is the Ascil value of the key
+                ; byte2 is the key modifiers
+                ; bit 1: open-apple down
+                ; bit 2: solid-apple down
+                ; byte3 snd byte4 are not used.
+        ; for update events:
+                ; bytel is the window id of the window requiring an update.
+                ; byte2, byte3, and byte4 are not used.
+*
+*
             lda TheEvent ; Transfer control to appropriate part of program
             ; get 1st byte of Event reconrd = event type.
 
-* TEST            
-           ; jsr poke_event
-* / TEST        
-;
             cmp #ButnDown       ; mouse button down ?
             bne Demo_3          ; no : check next event type
             jsr HandleButton    ; yes : gosub HandleButton
@@ -180,17 +211,16 @@ HandleUpdate equ *
             ; Parameters : None
 
             ************** following code added to demo program **************
-            ; if not : bad draw avec a window drag.
+            ; if not : bad draw of the window below, after drag of top window.
             lda UpdateID
             sta GWParms 
             TK_call GetWinPort;GWParms
             TK_call SetPort;TempPort 
-            **************************************************
-
+            ******************************************************************
 Update_1    rts
 ;
-;
-DrawItB equ *
+DrawItB equ *                                   ; Set port to window whose ID is in A
+                                                ; then draw its content
             ; set grafport 
             sta GWParms ; Get the port for the current window
             ; A = window ID 
@@ -228,11 +258,13 @@ DrawIt_4    cmp DialogWindow
 DrawIt_5    cmp AlertWindow
             bne DrawIt_6
             jmp DrawWin6
-DrawIt_6
-            jsr RingBell
+DrawIt_6    cmp MessageBox
+            bne DrawIt_7
+            jmp DrawWin7
+DrawIt_7    jsr RingBell
             rts ; Should never get here!
 ;
-DrawWin1    equ *                              ; SampleWindow
+DrawWin1    equ *                              ; Sample Window
             TK_call MoveTo;lazypt
             TK_call DrawText;lazyfox
             TK_call MoveTo;lazyptC
@@ -292,14 +324,14 @@ nextline
             ldx row
             cpx #9
             bne ShowChar_1
-            TK_call ShowCursor;0
 
             TK_call FrameRect;edit_r            ; show bounding box
             TK_call FrameRect;refresh_r
 
             TK_call MoveTo;RefrPt
             TK_call DrawText;LabelRefr
-            
+
+            TK_call ShowCursor;0
             rts
 
 MakeRect                                    ; Set up aRect var 
@@ -484,8 +516,7 @@ TextData    dw CurChar                      ; char var : pointer to char(s) to d
 CurChar     dfb 0                           ; char value var
 ;
 
-DrawWin6
-            
+DrawWin6 
             TK_call MoveTo;AlertPt1 
             TK_call DrawText;fontloaded
             TK_call MoveTo;AlertPt2 
@@ -496,13 +527,107 @@ getev       TK_call GetEvent;TheEvent
             beq getev
             TK_call CloseWindow;AlertWindow
             rts
-
 AlertPt1    dw 75,11
 AlertPt2    dw 40,22
 fontloaded  da fload+1
 fload       str 'Working font loaded !' 
 MsgClic     da msgc+1
 msgc        str '-- click the mouse or press a key --'
+
+
+DrawWin7
+            ; display MessageBox
+            TK_call SetPenMode;pencopy
+            TK_call SetPattern;Black  
+            TK_call MoveTo;MsgPt1
+            TK_call DrawText;question 
+            TK_call FrameRect;MsgRectYes
+            TK_call MoveTo;MsgPt2
+            TK_call DrawText;yesLabel 
+            TK_call FrameRect;MsgRectNo
+            TK_call MoveTo;MsgPt3
+            TK_call DrawText;noLabel 
+
+            ; track click in rects ou Y/N keys
+getev2      TK_call GetEvent;TheEvent
+            lda EvtType
+            cmp #KeyPress
+            bne nextevtype
+            lda EvtKey 
+            cmp #'Y'
+            beq OKsave
+            cmp #'y'
+            beq OKsave
+            cmp #'N'
+            beq :1
+            jmp NoSave
+:1          cmp #'n'
+            beq NoSave
+            jmp getev2
+nextevtype
+            cmp #ButnDown
+            bne getev2
+            jmp TrackYesNo
+            rts
+
+OKsave      
+            jsr SaveFont
+NoSave      TK_call CloseWindow;MessageBox
+            TK_call SetPenMode;pencopy
+            TK_call SetPattern;Black
+            rts
+            
+TrackYesNo
+            lda MessageBox
+            sta winid
+            ldx #00
+:2          lda MouseX,x                    ; copy point in sreen coordinate 
+            sta screenx,x                   ; to screenx/screeny input parameter
+            inx
+            cpx #04
+            bne :2
+            TK_call ScreenToWindow;win_coord
+
+            sup windowx;MsgRectYes
+            bcc outYes
+            sup windowx;MsgRectYes+4
+            bcs outYes
+            sup windowy;MsgRectYes+2
+            bcc outYes
+            sup windowy;MsgRectYes+6
+            bcs outYes 
+            TK_call SetPenMode;xSrcXOR
+            TK_call SetPattern;White
+            TK_call PaintRect;MsgRectYes 
+            jmp OKsave
+outYes
+            sup windowx;MsgRectNo
+            bcc outNO
+            sup windowx;MsgRectNo+4
+            bcs outNO
+            sup windowy;MsgRectNo+2
+            bcc outNO
+            sup windowy;MsgRectNo+6
+            bcs outNO
+            TK_call SetPenMode;xSrcXOR
+            TK_call SetPattern;White
+            TK_call PaintRect;MsgRectNo 
+            jmp NoSave
+
+outNO       jsr RingBell
+            jmp getev2
+
+MsgPt1      dw 34,11
+MsgPt2      dw 60,32
+MsgPt3      dw 195,32
+MsgRectYes  dw 40,22,100,33
+MsgRectNo   dw 170,22,230,33
+question    da qtext+1
+qtext       str 'Erase and replace WORK.FONT file ?'
+yesLabel    da yestext+1
+yestext     str 'Yes'
+noLabel     da  notext+1
+notext      str 'No'
 ;
 DrawWin4    equ *                            ; "TestWindow"
             rts
@@ -814,34 +939,42 @@ M1_1        TK_call GetEvent;TheEvent
 M1_2        TK_call CloseWindow;DialogWindow
             rts
 ;
-h_menu_2    equ *
+h_menu_2    equ *                               ; File menu
             lda MenuItem
             cmp #4                              ; enter monitor
             bne M2_1
             lda #$40
             sta Quit
+
 M2_1        cmp #5                              ; Quit
             bne M2_2
             lda #$80
             sta Quit
+
 M2_2        cmp #3                              ; reset menu
             bne M2_3
             Aux2Main SystemFont;SystemFontE 
             rts
-M2_3        cmp #1
+
+M2_3        cmp #1                              ; Load working font
             bne M2_4
             lda #1
             sta LoadFlag
             jsr LoadFont
             TK_call OpenWindow;AlertWindow 
             lda AlertWindow
-            jsr DrawItB  
-            rts
+            jmp DrawItB  
 
-M2_4        rts
+M2_4        cmp #2                              ; Save working font
+            bne M2_5
+            TK_call OpenWindow;MessageBox
+            lda MessageBox
+            jmp DrawItB
+
+M2_5        rts
 ;
-h_menu_3    equ *
-end_menu_3  rts
+h_menu_3    equ *                               ; Edit menu
+end_menu_3  rts                                 ; not implemented
 ;
 h_menu_4    equ *
             lda MenuItem
@@ -1877,8 +2010,29 @@ AlertWindow dfb 6,%00000001                         ; Alert Box
             dfb 1,1
             dfb 0,$7F
             dw SystemFont
-;
             dw 0 ;link to next window
+
+MessageBox  dfb 7,%00000001                         ; Alert Box
+            dw 0                                    ; no title
+            dfb 0,0 ;ctrl options
+            dfb 0,0 ; H-ThumbMax and H-Thumb Pos
+            dfb 0,0 ; V-ThumbMax and V-Thumb Pos
+            dfb 0,0 ; Window Option Byte and Reserved
+;
+            dw 100,100
+            dw 500,180
+;
+            dw 150,30 ;window port
+            dw $2000,$80
+            dw 0,0,260,40                           ; size ?
+            ds 8,$FF
+            dfb $FF,0 ; and & or masks
+            dw 0,0
+            dfb 1,1
+            dfb 0,$7F
+            dw SystemFont
+            dw 0 ;link to next window
+
 ;
 SampleStr    str 'Sample '
 EditFontWStr str 'Edit font'
@@ -1938,47 +2092,7 @@ ThumbMoved equ *+6
             ds 5,0 ; 5 bytes for the event
             ds 2,0 ; 2 bytes for find results and tracking
 *
-* Event record : 
-        ; evt_kind : byte;
-        ; bytel
-        ; byte2
-        ; byte3
-        ; byte4
-; 
-* evt_kind : the event type, which is one of the following:
-        ; no_event = 0;
-        ; button_down = 1;
-        ; button_up = 2;
-        ; key_down = 3;
-        ; drag = 4;
-        ; apple_key = 5;
-        ; update_event = 6;
-*
-; Event types 7.. 127 are reserved for standard eventa which may be
-; added in future versions of the Tool Kit. The user may define his
-; own event types In the range 128..255 and poat these to the event
-; queue.
-; "Bytel, byte2, byte3, and byte4" contain information according to
-; the event type:
-; 
-    ; for no_event, button_down, button__up, drag, and apple_key events:
-            ; bytel and byte2 are the low-order and high-order bytes,
-            ; respectively, of the x-posltion of the mouse in mouse or
-            ; desktop coordinates.
-            ; byte3 and byte4 are the low-order and high-order bytes,
-            ; respectively, of the y-position of the mouse in mouse or
-            ; desktop coordinates.
-    ; for key__down events:
-            ; bytel Is the Ascil value of the key
-            ; byte2 is the key modifiers
-            ; bit 1: open-apple down
-            ; bit 2: solid-apple down
-            ; byte3 snd byte4 are not used.
-    ; for update events:
-            ; bytel is the window id of the window requiring an update.
-            ; byte2, byte3, and byte4 are not used.
-*
-*
+
 *
 MenuCmd dfb 0
 MenuItem dfb 0
@@ -2096,7 +2210,7 @@ FileItem1 str 'Enter Monitor'
 FileItem2 str 'Quit'
 FileItemLoad str 'Load working font'
 FileItemSave str 'Save working font'
-FileItemReset str 'Reset default font'
+FileItemReset str 'Reset system font'
 ;
 EditItem1 str 'Undo'
 EditItem2 str 'Cut'
@@ -2263,7 +2377,7 @@ testl       lda workfont,x          ; LoadFlag <> 0  : set 'WORK.TEST' as file n
             bpl testl
             jmp LoadStart
 
-workl       lda testfont,x          ; LoadFlag = 0  : set 'TEST.TEST' as file name (default font)
+workl       lda testfont,x          ; LoadFlag = 0  : set 'TEST.TEST' as file name (system font)
             sta tfont+1,x 
             dex  
             bpl workl
@@ -2291,8 +2405,8 @@ DoOpen                              ; adjust prefix length
             jmp error
 DoLoad                              ; load it in memory
             lda refnum              ; copy ref num of open file for next MLI calls
-            sta refnum2 
-            sta refnum3
+            sta refnum2             ; for read call 
+            sta refnum3             ; for close call
 
             jsr MLI
             dfb read
@@ -2307,5 +2421,62 @@ CloseFile                           ; and close file
             rts
 
 LoadFlag    ds 1
+
+
+
+SaveFont    
+            jsr DoPrefix            ; set prefix in path var (strating and ending with /
+
+            ldx #3
+testl2      lda workfont,x          ; set 'WORK.TEST' as file name
+            sta tfont+1,x 
+            dex  
+            bpl testl2
+
+            ldy #0                  ; add file name string to prefix
+            ldx path                ; get prefix length
+:1          inx                     ; set x index to next position in prefix
+            lda tfont+1,y           ; read char in file name string
+            beq DoOpen2             ; if value = 0 : exit loop
+            sta path,x              ; store char at the end of prefix string
+            iny                     ; next char
+            jmp :1                  ; loop
+
+DoOpen2                             ; adjust prefix length
+            lda path                ; by adding file name length
+            clc
+            adc tfont               ; file name length
+            sta path
+
+            jsr MLI                 ; open file 
+            dfb open
+            da openparam
+            bcc DoSave
+            jmp error
+
+DoSave                              ; save file to disk 
+            lda refnum              ; copy ref num of open file for next MLI calls
+            sta refnum4             ; for write call 
+            sta refnum3             ; for close call
+
+            jsr MLI
+            dfb write
+            da writeparam
+            bcc CloseFile2
+            jmp error
+
+CloseFile2                          ; and close file
+            jsr MLI
+            dfb close
+            da closeparam
+
+            rts
+
+writeparam
+            dfb 4
+refnum4     ds 1
+            da SystemFont
+            dw 1283
+            ds 2                       
 
 prgend  equ *
