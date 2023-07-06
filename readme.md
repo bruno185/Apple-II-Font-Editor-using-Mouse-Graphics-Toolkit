@@ -1,12 +1,15 @@
-# Apple II : Mouse Graphics Toolkit Demo in Merlin 32 syntax
+# Apple II : Font Editor, using Mouse Graphics Toolkit in Merlin 32 syntax
 
-Here is the translation in Merlin 32 syntax of the "Mouse Graphics Toolkit" demo program. This very good library greatly facilitated the writing of double hires Apple II programs with the "Desktop" look, as on Macintosh and GS/OS. 
+Based on the Mouse Graphics Toolkit demo program, here's a program that lets you modify the system font.
 
-The original source file is TK.DEMO.original.s; the file in Merlin 32 format is tkdemo.s.
+The Tool Kit demo program was first converted to Merlin format (Merlin 32) and then adapted for font editing.
+
+
+The original source file is TK.DEMO.original.s; the file in Merlin 32 format is tkdemo.s. (Note that the original program does not load the font, which must first be loaded by the STARTUP program in BASIC).
 
 I've commented heavily on the source code (tkdemo.s and equates.s), integrating parts of the documentation in addition to my own comments. This makes the program easier to read and understand. 
 
-The Mouse Graphics Toolkit is the Apple IIe / IIc forerunner of the Toolbox on the Apple IIGS and Macintosh. It's a great way to familiarize yourself with event-driven programming and the Apple's "Guidelines"
+The Mouse Graphics Toolkit is the Apple IIe / IIc ancestor of the Apple IIGS and Macintosh Toolbox. It's an excellent way to familiarize yourself with event-driven programming and Apple's "guidelines".
 
 ## Use
 This archive contains a ProDOS disk image (tkdemo.po) to be used it your favourite Apple II emulator or your Apple II.
@@ -32,7 +35,8 @@ Here is my configuration:
 
 * [Ciderpress ; disk image utility](a2ciderpress.com)
 
-Note :
+Compilation notes :
+
 DoMerlin.bat puts it all together. If you want to compile yourself, you will have to adapt the path to the Merlin32 directory, to Applewin and to Applecommander in DoMerlin.bat file.
 
 DoMerlin.bat is to be placed in project directory.

@@ -455,6 +455,11 @@ DeltaY      equ 10
 K1          equ 6 ; put these temporary counters on zero page
 K2          equ 7
 
+
+* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+* make display font faster
+* make charracters clickable
+
 DrawWin3    equ *                           ; CharsWindow
                                             ; display 128 chars (ascii 0 to 127), 8 rows of 16 chars
             ldx #3
@@ -510,7 +515,6 @@ TextData    dw CurChar                      ; char var : pointer to char(s) to d
             dfb 1                           ; length of string to draw
 CurChar     dfb 0                           ; char value var
 ;
-
 DrawWin6 
             TK_call MoveTo;AlertPt1 
             TK_call DrawText;fontloaded
@@ -530,6 +534,8 @@ AlertPt1    dw 75,11
 AlertPt2    dw 40,22
 fontloaded  da fload+1
 fload       str 'Working font loaded !' 
+fontsaved   da fsave+1
+fsave       str 'Working font saved !' 
 MsgClic     da msgc+1
 msgc        str '-- click the mouse or press a key --'
 *
@@ -796,7 +802,7 @@ StrTableLow db L1,L2,L3,L4,L5,L6,L7,L8      ; table of low byte of string addres
 ;StrTableHi  db <L1,<L2,<L3,<L4,<L5,<L6,<L7,<L8
 StrTableHi  db >L1,>L2,>L3,>L4,>L5,>L6,>L7,>L8  ; table of hi byte of string addresses
 L1          dw *+3
-            str 'Mouse Graphics Tool Kit Demonstration'
+            str 'Font Editor for Mouse Graphics Tool Kit '
 L2          dw *+3
             str '   '                       ; empty line
 L3          dw *+3
@@ -806,14 +812,16 @@ L4          dw *+3
 L5          dw *+3
             str 'things on an Apple // that you thought'
 L6          dw *+3
-            dfb 35
+            dfb 45
 ;     123456789012345678901234567890123
             asc 'were only possible on a Macintosh'
+            dfb 16,17 ; the TM chars in the font.
+            asc ' or a GS'
             dfb 16,17 ; the TM chars in the font.
 L7          dw *+3
             str ' '                         ; empty line
 L8          dw *+3
-            str 'Click in this window to continue.'
+            str 'Click in this window to continue or hit a key.'
 *
 * Date for drawing windows
 *
@@ -975,7 +983,7 @@ M2_3        cmp #1                              ; Load working font
             sta saveQtext
             lda question+1
             sta saveQtext+1
-            lda qtext
+            lda qtext                           ; save mesage length
             sta saveQtext+2
 
             lda #<Conftext+1                    ; set load confirmation message
@@ -990,7 +998,7 @@ M2_3        cmp #1                              ; Load working font
             lda MessageBox
             jsr DrawItB                         ; draw content and process user's choice
 
-            lda saveQtext                       ; restore message string
+            lda saveQtext                       ; restore message string and string length
             sta question
             lda saveQtext+1
             sta question+1
@@ -1016,6 +1024,33 @@ M2_4        cmp #2                              ; Save working font
             lda YesNoResult                     ; get user'a choice
             beq M2_5                            ; no : rts
             jsr SaveFont                        ; yes : save current work font
+            jsr ClearUpdates                    ; ofrce update of window below, if any.
+            TK_call OpenWindow;AlertWindow      ; loading completed message 
+
+            lda fontloaded                      ; Save Message string
+            sta saveQtext
+            lda fontloaded+1
+            sta saveQtext+1
+            lda fload                           ; save mesage length
+            sta saveQtext+2
+
+            lda #<fsave+1                       ; set save confirmation message
+            sta fontloaded
+            lda #>fsave+1
+            sta fontloaded+1  
+            lda fsave
+            sta fload
+
+            lda AlertWindow
+            jmp DrawItB                         ; draw loading completed message and exit
+
+            lda saveQtext                       ; restore message string and string length
+            sta fontsaved
+            lda saveQtext+1
+            sta fontsaved+1
+            lda saveQtext+2
+            sta fsave    
+
 M2_5        rts                                 ; should never get here
 ;
 h_menu_3    equ *                               ; Edit menu
@@ -2025,7 +2060,7 @@ DialogWindow dfb 5,%00000001 ; Dialog Box
 ;
             dw 150,30 ;window port
             dw $2000,$80
-            dw 0,0,260,100
+            dw 0,0,264,100
             ds 8,$FF
             dfb $FF,0 ; and & or masks
             dw 0,0
@@ -2249,7 +2284,7 @@ MTStr str 'Menu Test'
 WTStr str 'Window Test'
 DummyStr str 'Dummy'
 ;
-AppleItem1 str 'About this demo...'
+AppleItem1 str 'About Font Editor... '
 ;
 FileItem1 str 'Enter Monitor'
 FileItem2 str 'Quit'
