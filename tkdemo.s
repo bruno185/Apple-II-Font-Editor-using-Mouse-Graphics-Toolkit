@@ -517,9 +517,13 @@ DrawWin6
             TK_call MoveTo;AlertPt2 
             TK_call DrawText;MsgClic 
 
+            TK_call FlushEvents;0
+
 getev       TK_call GetEvent;TheEvent
             lda EvtType
             beq getev
+            cmp #ButnUp
+            beq getev                           ; to flush this kinf of event 
             TK_call CloseWindow;AlertWindow
             rts
 AlertPt1    dw 75,11
@@ -531,6 +535,10 @@ msgc        str '-- click the mouse or press a key --'
 *
 *
 DrawWin7
+            jsr DoYesNoMsg                      ; Draw box and process user's choice (Yes/No)
+            rts
+            
+DoYesNoMsg
             ; display MessageBox content
             TK_call SetPenMode;pencopy
             TK_call SetPattern;Black  
@@ -554,10 +562,10 @@ getev2      TK_call GetEvent;TheEvent
             cmp #'y'
             beq OKsave
             cmp #'N'
-            beq :1
-            jmp NoSave
+            beq NoSave
 :1          cmp #'n'
             beq NoSave
+            jsr RingBell
             jmp getev2
 nextevtype
             cmp #ButnDown
@@ -566,8 +574,20 @@ nextevtype
             rts
 
 OKsave      
-            jsr SaveFont
-NoSave      TK_call CloseWindow;MessageBox
+            lda #1
+            sta YesNoResult
+            TK_call SetPenMode;xSrcXOR
+            TK_call SetPattern;White
+            TK_call PaintRect;MsgRectYes 
+            jmp outMsg
+
+NoSave      lda #0
+            sta YesNoResult      
+            TK_call SetPenMode;xSrcXOR
+            TK_call SetPattern;White
+            TK_call PaintRect;MsgRectNo 
+
+outMsg      TK_call CloseWindow;MessageBox
             TK_call SetPenMode;pencopy
             TK_call SetPattern;Black
             rts
@@ -591,9 +611,6 @@ TrackYesNo
             bcc outYes
             sup windowy;MsgRectYes+6
             bcs outYes 
-            TK_call SetPenMode;xSrcXOR
-            TK_call SetPattern;White
-            TK_call PaintRect;MsgRectYes 
             jmp OKsave
 outYes
             sup windowx;MsgRectNo
@@ -604,13 +621,10 @@ outYes
             bcc outNO
             sup windowy;MsgRectNo+6
             bcs outNO
-            TK_call SetPenMode;xSrcXOR
-            TK_call SetPattern;White
-            TK_call PaintRect;MsgRectNo 
             jmp NoSave
-
+ 
 outNO       jsr RingBell
-            jmp getev2
+            jmp getev2 
 
 MsgPt1      dw 34,11
 MsgPt2      dw 60,32
@@ -623,7 +637,10 @@ yesLabel    da yestext+1
 yestext     str 'Yes'
 noLabel     da  notext+1
 notext      str 'No'
-;
+YesNoResult ds 1
+*
+*
+*
 DrawWin4    equ *                            ; "TestWindow"
             rts
 
@@ -912,11 +929,11 @@ Menu_Done equ *
             ; here, turns highlighting off, since the action is finished.
             rts
 ;
-h_menu_1    equ *
-            TK_call OpenWindow;DialogWindow
+h_menu_1    equ *                               ; Apple  menu (1 item)
+            TK_call OpenWindow;DialogWindow     ; Show About box
             lda DialogWindow
-            jsr DrawItB
-M1_1        TK_call GetEvent;TheEvent
+            jsr DrawItB                         ; Draw it
+M1_1        TK_call GetEvent;TheEvent           ; get a mouse down or keypress event
             lda EvtType
             cmp #KeyPress
             beq M1_2
@@ -931,12 +948,12 @@ M1_1        TK_call GetEvent;TheEvent
             bne M1_1
 ;M1_2        TK_call CloseWindow;WindowFound    ; this is a bug !! If call after KeyPress event, 
                                                 ; WindowFound is not defined, the windows will not close.
-M1_2        TK_call CloseWindow;DialogWindow
+M1_2        TK_call CloseWindow;DialogWindow    ; Close About box
             rts
 ;
 h_menu_2    equ *                               ; File menu
             lda MenuItem
-            cmp #4                              ; enter monitor
+            cmp #4                              ; Enter monitor
             bne M2_1
             lda #$40
             sta Quit
@@ -946,27 +963,60 @@ M2_1        cmp #5                              ; Quit
             lda #$80
             sta Quit
 
-M2_2        cmp #3                              ; reset menu
+M2_2        cmp #3                              ; Reset menu
             bne M2_3
             Aux2Main SystemFont;SystemFontE 
             rts
 
 M2_3        cmp #1                              ; Load working font
             bne M2_4
-            lda #1
-            sta LoadFlag
-            jsr LoadFont
-            TK_call OpenWindow;AlertWindow 
+
+            lda question                        ; Save Message string
+            sta saveQtext
+            lda question+1
+            sta saveQtext+1
+            lda qtext
+            sta saveQtext+2
+
+            lda #<Conftext+1                    ; set load confirmation message
+            sta question
+            lda #>Conftext+1
+            sta question+1  
+            lda Conftext
+            sta qtext
+
+            TK_call OpenWindow;MessageBox
+
+            lda MessageBox
+            jsr DrawItB                         ; draw content and process user's choice
+
+            lda saveQtext                       ; restore message string
+            sta question
+            lda saveQtext+1
+            sta question+1
+            lda saveQtext+2
+            sta qtext            
+
+            lda YesNoResult                     ; get user'a choice
+            bne :1                              ; user answered no : rts
+            rts    
+:1          lda #1                              ; user answered yes : load font
+            sta LoadFlag                        ; flag for WORK font
+            jsr LoadFont                        ; load font in memory
+            jsr ClearUpdates                    ; ofrce update of window below, if any.
+            TK_call OpenWindow;AlertWindow      ; loading completed message 
             lda AlertWindow
-            jmp DrawItB  
+            jmp DrawItB                         ; draw loading completed message and exit
 
 M2_4        cmp #2                              ; Save working font
             bne M2_5
-            TK_call OpenWindow;MessageBox
+            TK_call OpenWindow;MessageBox       ; open message box
             lda MessageBox
-            jmp DrawItB
-
-M2_5        rts
+            jsr DrawItB                         ; draw content and process user's choice                   
+            lda YesNoResult                     ; get user'a choice
+            beq M2_5                            ; no : rts
+            jsr SaveFont                        ; yes : save current work font
+M2_5        rts                                 ; should never get here
 ;
 h_menu_3    equ *                               ; Edit menu
 end_menu_3  rts                                 ; not implemented
@@ -2226,9 +2276,6 @@ WindowItem7 str 'Hide'
 DoNotSave dfb 0
 SaveZP dfb $80
 
-********************* TESTS *********************
-            ; put test         
-
 
 WaitForKeyPress equ *                                   ; wait a key from user
                 jsr Bell                                ; play a sound
@@ -2416,6 +2463,12 @@ CloseFile                           ; and close file
             rts
 
 LoadFlag    ds 1
+
+
+
+
+saveQtext   ds 3
+Conftext    str 'Changes will be lost, can you confirm?'
 
 
 
