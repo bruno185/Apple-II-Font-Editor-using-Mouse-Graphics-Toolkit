@@ -4,10 +4,7 @@ Based on the Mouse Graphics Toolkit demo program, here's a program that lets you
 
 The Tool Kit demo program was first converted to Merlin format (Merlin 32) and then adapted for font editing.
 
-
-The original source file is TK.DEMO.original.s; the file in Merlin 32 format is tkdemo.s. (Note that the original program does not load the font, which must first be loaded by the STARTUP program in BASIC).
-
-I've commented heavily on the source code (tkdemo.s and equates.s), integrating parts of the documentation in addition to my own comments. This makes the program easier to read and understand. 
+I've commented heavily on the source code (tkdemo.s and equates.s), integrating parts of the documentation in addition to my own comments. This makes the program easy to read and understand. 
 
 The Mouse Graphics Toolkit is the Apple IIe / IIc ancestor of the Apple IIGS and Macintosh Toolbox. It's an excellent way to familiarize yourself with event-driven programming and Apple's "guidelines".
 
