@@ -284,14 +284,29 @@ DrawWin2 equ *                                  ; EditFontW
             TK_call SetPattern;White 
             TK_call PaintRect;bwRect            ; empty window contet with white
             TK_call SetPattern;Black
+            jsr ShowLabel1                      ; display top label
+            jsr ShowCharGrid                    ; display char grid
+            jsr ShowRefresh
+            
+            TK_call ShowCursor;0
+            rts
 
+ShowLabel1
             TK_call MoveTo;MyPoint              ; move pen to position 
             ; MoveTo : Moves the current pen location to tha specified point (x, y: integer)
             ; Parameters :
                 ; a_point: point (input) new pen location (x, y: integer)
             TK_call DrawText;MyText             ; draw a string (Character : ...)
+            rts
 
-ShowChar
+ShowRefresh
+            TK_call FrameRect;edit_r            ; show bounding box
+            TK_call FrameRect;refresh_r
+            TK_call MoveTo;RefrPt
+            TK_call DrawText;LabelRefr
+            rts
+
+ShowCharGrid
             ldx DispChar                        ; get ascii value of char to display
             jsr GetCharVal                      ; get all 9 bytes of this char in MyChar array
             jsr InitRect                        ; set bitmaps view loc top left = BasePoint
@@ -324,20 +339,17 @@ nextline
             ldx row
             cpx #9                              ; all 9 lines done ?
             bne ShowChar_1
-
-            TK_call FrameRect;edit_r            ; show bounding box
-            TK_call FrameRect;refresh_r
-
-            TK_call MoveTo;RefrPt
-            TK_call DrawText;LabelRefr
-
-            TK_call ShowCursor;0
             rts
+*
+*
+
+*
+*
 
 MakeRect                                    ; Set up aRect var 
                                             ; top.left coner : same as aRectTopLeft view loc
                                             ; bottom.down.x = top.left.x + gapx ; bottom.down.y = top.left.y + gapy 
-            lda aRectTopLeft                   ; top.left.x
+            lda aRectTopLeft                ; top.left.x
             sta aRect
             lda aRectTopLeft+1
             sta aRect+1
