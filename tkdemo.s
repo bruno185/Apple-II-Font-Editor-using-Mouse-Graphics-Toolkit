@@ -2012,7 +2012,7 @@ CharsWindow dfb 3,%00000010 ; Has GoAway but no Grow Box
             dw 100,100
             dw 500,180
 ;
-            dw 20,90 ;window port
+            dw 358,27 ;window port
             dw $2000,$80
             dw 0,0,180,90
             ds 8,$FF
