@@ -286,10 +286,45 @@ DrawWin2 equ *                                  ; EditFontW
             TK_call SetPattern;Black
             jsr ShowLabel1                      ; display top label
             jsr ShowCharGrid                    ; display char grid
-            jsr ShowRefresh
-            
+            jsr ShowRefresh                     ; display "Refresh Window" button
+            jsr ShowAsciiL
+
             TK_call ShowCursor;0
             rts
+
+ShowAsciiL  
+            TK_call MoveTo;AsciiLPt              ; move pen to position 
+            TK_call DrawText;AsciiLtxt
+            TK_call MoveTo;AsciiValPt
+            lda DispChar
+            jsr ByteOut
+            TK_call PaintPoly;AsciiLPoly
+            TK_call PaintPoly;AsciiRPoly
+            rts
+
+AsciiLPt    dw 195,62
+AsciiValPt  dw 240,74
+AsciiLtxt   da altext+1
+altext      str 'Char ASCII value :'
+
+AsciiLRect dw 220,64,230,74
+AsciiRRect dw 267,64,277,74
+AsciiLPoly  
+            db 3,0
+            dw 230,74,220,69,230,64
+AsciiRPoly  
+            db 3,0
+            dw 267,74,267,64,277,69
+
+
+* polygon list struture :
+; db : nb. of vertices
+; db polylast :  0 ; $80 if not last.EvtKe
+; dw X of vertice 1
+; dw Y of vertice 1
+; dw X of vertice 2
+; dw Y of vertice 2
+; ...
 
 ShowLabel1
             TK_call MoveTo;MyPoint              ; move pen to position 
@@ -300,13 +335,13 @@ ShowLabel1
             rts
 
 ShowRefresh
-            TK_call FrameRect;edit_r            ; show bounding box
             TK_call FrameRect;refresh_r
             TK_call MoveTo;RefrPt
             TK_call DrawText;LabelRefr
             rts
 
 ShowCharGrid
+            TK_call FrameRect;edit_r            ; show bounding box
             ldx DispChar                        ; get ascii value of char to display
             jsr GetCharVal                      ; get all 9 bytes of this char in MyChar array
             jsr InitRect                        ; set bitmaps view loc top left = BasePoint
@@ -340,11 +375,6 @@ nextline
             cpx #9                              ; all 9 lines done ?
             bne ShowChar_1
             rts
-*
-*
-
-*
-*
 
 MakeRect                                    ; Set up aRect var 
                                             ; top.left coner : same as aRectTopLeft view loc
@@ -466,11 +496,6 @@ DeltaX      equ 10
 DeltaY      equ 10
 K1          equ 6 ; put these temporary counters on zero page
 K2          equ 7
-
-
-* XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-* make display font faster
-* make charracters clickable
 
 DrawWin3    equ *                           ; CharsWindow
                                             ; display 128 chars (ascii 0 to 127), 8 rows of 16 chars
@@ -843,14 +868,7 @@ xSrcXOR     dfb 2                           ; penmode = penBIC  : Bit Clear (BIC
                                             ; AND destination))
 
 
-* polygon list struture :
-; db : nb. of vertices
-; db polylast :  0 ; $80 if not last.EvtKe
-; dw X of vertice 1
-; dw Y of vertice 1
-; dw X of vertice 2
-; dw Y of vertice 2
-; ...
+
 *
 * Data for Setting up the window port
 *
@@ -1487,8 +1505,42 @@ outEditBox
 
             TK_call SetPenMode;pencopy
             jmp DrawWin2
-outRefr     
-            jmp RingBell
+
+outRefr                                             ; here if click not in edit box 
+                                                    ; nor in refresh button
+            TK_call MoveTo;windowx
+            
+            TK_call InRect;AsciiLRect
+            ; InPoly : Detects whether the current pen location is inside the specified
+            ; polygon. Returns an error code of $80 if so, else returns no error
+            ; (error code of 0).
+            cmp #$80
+            bne :1
+            TK_call SetPattern;White
+            TK_call PaintPoly;AsciiLPoly
+            TK_call SetPattern;Black
+            TK_call PaintPoly;AsciiLPoly
+            lda DispChar
+            beq DoRing
+            dec DispChar
+            jsr DrawWin2
+            rts
+
+:1          TK_call InRect;AsciiRRect
+            cmp #$80
+            bne DoRing
+            lda DispChar
+            cmp #127
+            bcs DoRing
+            TK_call SetPattern;White
+            TK_call PaintPoly;AsciiRPoly
+            TK_call SetPattern;Black
+            TK_call PaintPoly;AsciiRPoly
+            inc DispChar
+            jsr DrawWin2
+            rts
+
+DoRing      jmp RingBell
 
 
 inbox       TK_call MoveTo;tmppt                    ; move pen  
