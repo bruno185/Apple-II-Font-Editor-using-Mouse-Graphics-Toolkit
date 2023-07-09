@@ -642,3 +642,47 @@ RestoreMarks equ *
 Unmark8     dfb 7,8,0,0                         ; menu 7, item 8, use standard char, 0 (could be any value)
 Unmark9     dfb 7,9,0,0                         ; menu 7, item 9, use standard char, 0 (could be any value)
 ;
+
+
+
+            sup windowx;MsgRectYes
+            bcc outYes
+            sup windowx;MsgRectYes+4
+            bcs outYes
+            sup windowy;MsgRectYes+2
+            bcc outYes
+            sup windowy;MsgRectYes+6
+            bcs outYes 
+            jmp OKsave
+
+outYes
+            sup windowx;MsgRectNo
+            bcc outNO
+            sup windowx;MsgRectNo+4
+            bcs outNO
+            sup windowy;MsgRectNo+2
+            bcc outNO
+            sup windowy;MsgRectNo+6
+            bcs outNO
+            jmp NoSave
+
+
+
+            sup windowx;edit_r_tl_x
+            bcc outEditBox
+            sup windowx;edit_r_bd_x
+            bcs outEditBox
+            sup windowy;edit_r_tl_y
+            bcc outEditBox
+            sup windowy;edit_r_bd_y
+            bcs outEditBox 
+            jmp inbox
+
+            sup windowx;refresh_r
+            bcc outRefr
+            sup windowx;refresh_r+4
+            bcs outRefr
+            sup windowy;refresh_r+2
+            bcc outRefr
+            sup windowy;refresh_r+6
+            bcs outRefr 

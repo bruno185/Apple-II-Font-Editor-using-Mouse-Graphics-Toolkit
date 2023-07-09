@@ -299,7 +299,9 @@ ShowAsciiL
             lda DispChar
             jsr ByteOut
             TK_call PaintPoly;AsciiLPoly
+            TK_call PaintPoly;AsciiLfastP
             TK_call PaintPoly;AsciiRPoly
+            TK_call PaintPoly;AsciiRfastP
             rts
 
 AsciiLPt    dw 195,62
@@ -311,10 +313,18 @@ AsciiLRect dw 220,64,230,74
 AsciiRRect dw 267,64,277,74
 AsciiLPoly  
             db 3,0
-            dw 230,74,220,69,230,64
+            dw 230,74,230,64,220,69
 AsciiRPoly  
             db 3,0
             dw 267,74,267,64,277,69
+
+AsciiLfastR dw 197,64,215,74
+AsciiLfastP db 7,0
+            dw 215,74,215,64,207,67,207,64,197,69,207,74,207,71
+
+AsciiRfastR dw 282,64,300,74
+AsciiRfastP db 7,0
+            dw 282,74,282,64,290,67,290,64,300,69,290,74,290,71
 
 
 * polygon list struture :
@@ -646,26 +656,15 @@ TrackYesNo
             bne :2
             TK_call ScreenToWindow;win_coord
 
-            sup windowx;MsgRectYes
-            bcc outYes
-            sup windowx;MsgRectYes+4
-            bcs outYes
-            sup windowy;MsgRectYes+2
-            bcc outYes
-            sup windowy;MsgRectYes+6
-            bcs outYes 
-            jmp OKsave
-outYes
-            sup windowx;MsgRectNo
-            bcc outNO
-            sup windowx;MsgRectNo+4
-            bcs outNO
-            sup windowy;MsgRectNo+2
-            bcc outNO
-            sup windowy;MsgRectNo+6
-            bcs outNO
-            jmp NoSave
- 
+            TK_call MoveTo;windowx
+            TK_call InRect;MsgRectYes
+            cmp #$80
+            beq OKsave
+
+            TK_call InRect;MsgRectNo
+            cmp #$80
+            beq NoSave
+
 outNO       jsr RingBell
             jmp getev2 
 
@@ -1453,7 +1452,6 @@ Content_2   rts
 
 ******************************************************************************
 DoClickIn                                   ; after click in EditFontW content
-            ; jsr RingBell
             lda OnTop                       ; get top window
             cmp EditFontW                   ; = EditFontW ?
             beq DC_2                        ; yes : proceed with a click in EditFontW
@@ -1474,34 +1472,20 @@ DC_2        sta win_coord                   ; populate parameters for ScreenToWi
                 ; windowx (output) integer : corresponding window x-coordinate
                 ; windowy (output) integer : corresponding window y-coordinate
 
-                                                    ; Test bounding box
-            sup windowx;edit_r_tl_x
-            bcc outEditBox
-            sup windowx;edit_r_bd_x
-            bcs outEditBox
-            sup windowy;edit_r_tl_y
-            bcc outEditBox
-            sup windowy;edit_r_bd_y
-            bcs outEditBox 
-            jmp inbox
+            TK_call MoveTo;windowx                  ; test click in bounding box of edit area
+            TK_call InRect;edit_r
+            cmp #$80
+            bne outEditBox
+            jmp inbox                                    
 
 outEditBox  
-            sup windowx;refresh_r
-            bcc outRefr
-            sup windowx;refresh_r+4
-            bcs outRefr
-            sup windowy;refresh_r+2
-            bcc outRefr
-            sup windowy;refresh_r+6
-            bcs outRefr 
+            TK_call InRect;refresh_r                ; test click in Refresh button
+            cmp #$80
+            bne outRefr
 
             TK_call SetPenMode;xSrcXOR
             TK_call SetPattern;White
             TK_call PaintRect;refresh_r
-            TK_call PaintRect;refresh_r
-            ;TK_call PaintRect;refresh_r
-            ;TK_call PaintRect;refresh_r
-            ;TK_call PaintRect;refresh_r
 
             TK_call SetPenMode;pencopy
             jmp DrawWin2
@@ -1509,39 +1493,83 @@ outEditBox
 outRefr                                             ; here if click not in edit box 
                                                     ; nor in refresh button
             TK_call MoveTo;windowx
-            
             TK_call InRect;AsciiLRect
-            ; InPoly : Detects whether the current pen location is inside the specified
-            ; polygon. Returns an error code of $80 if so, else returns no error
-            ; (error code of 0).
-            cmp #$80
-            bne :1
-            TK_call SetPattern;White
-            TK_call PaintPoly;AsciiLPoly
-            TK_call SetPattern;Black
-            TK_call PaintPoly;AsciiLPoly
-            lda DispChar
-            beq DoRing
-            dec DispChar
-            jsr DrawWin2
-            rts
+            ; InRect : Detects whether the current pen location Is inside the specified
+            ; rectangle. Returns an error eode of $80 if so, else it returns no error (error code of 0).
+            ; Parameters:
+                    ; a_rect: rect (input) the rectangle of interest
 
-:1          TK_call InRect;AsciiRRect
-            cmp #$80
-            bne DoRing
-            lda DispChar
-            cmp #127
-            bcs DoRing
-            TK_call SetPattern;White
+            cmp #$80                                ; click in left arrow ?
+            bne inRect1                             ; no : next test
+            TK_call SetPattern;White                ; yes : make poly blink
+            TK_call PaintPoly;AsciiLPoly
+            TK_call SetPattern;Black
+            TK_call PaintPoly;AsciiLPoly
+            lda DispChar                            ; get curent char
+            bne charOK                              ; if already 0, ring
+            jmp DoRing
+charOK      dec DispChar                            ; else char = char - 1
+            jmp DrawWin2                            ; redraw window
+
+inRect1     TK_call InRect;AsciiRRect
+            cmp #$80                                ; click in right arrow ?
+            bne inRect2                             ; no : next test
+            TK_call SetPattern;White                ; yes : make poly blink
             TK_call PaintPoly;AsciiRPoly
             TK_call SetPattern;Black
             TK_call PaintPoly;AsciiRPoly
-            inc DispChar
-            jsr DrawWin2
-            rts
+            lda DispChar                            ; get curent char
+            cmp #127                                ; if allready 127 : ring
+            bcs RingJmp
+            inc DispChar                            ; else char = char - 1
+            jmp DrawWin2                            ; redraw window
+RingJmp     jmp RingBell
+
+inRect2     TK_call InRect;AsciiLfastR              
+            cmp #$80                                ; click in double left arrow ?
+            bne inRect3                             ; no : next test
+            TK_call SetPattern;White                ; yes : make poly blink
+            TK_call PaintPoly;AsciiLfastP
+            TK_call SetPattern;Black
+            TK_call PaintPoly;AsciiLfastP
+            lda DispChar                            ; get curent char
+            beq RingJmp                             ; if 0 then ring
+            cmp #16                                 ; >= 16 
+            bcs dosup10                             ; yes 
+            lda #0                                  ; no : set char to 0
+            sta DispChar
+            jmp DrawWin2                            ; and draw window
+dosup10     lda DispChar                            ; get current char
+            sec
+            sbc #16
+            sta DispChar                            ; char = char - 16
+jstdraw     jmp DrawWin2                            ; redraw window
+
+
+inRect3     TK_call InRect;AsciiRfastR
+            cmp #$80                                ; click in double right arrow ?
+            bne DoRing                              ; no : ring (no more InRect test)
+            TK_call SetPattern;White                ; yes : make poly blink
+            TK_call PaintPoly;AsciiRfastP
+            TK_call SetPattern;Black
+            TK_call PaintPoly;AsciiRfastP
+            lda DispChar                            ; get current char
+            cmp #127                                ; = 127 ? 
+            bne 1:                                  
+            jmp RingBell                            ; yes : ring and exit
+1:          cmp #127-16                             ; <= 127-16 ?
+            bcs dosup127                            
+            clc                                     ; yes :
+            adc #16
+            sta DispChar                            ; char = char + 16
+            jmp DrawWin2                            ; redraw window
+dosup127    lda #127                                ; no :
+            sta DispChar                            ; char = 127
+            jmp DrawWin2                            ; redraw window
+
+* XXXXXXXXXXXXXXXXXXXXXXxXX + repaint only letf part of window.
 
 DoRing      jmp RingBell
-
 
 inbox       TK_call MoveTo;tmppt                    ; move pen  
             jsr DodivX                              ; divide windowx-margin by gapx
@@ -1729,21 +1757,21 @@ bfontTable  da SystemFont+3+128
 SquareX     dw 0
 SquareY     dw 0    
 
-DodivX      lda windowx
+DodivX      lda windowx                         ; get x value of point
             sec
-            sbc edit_r_tl_x
-            sta dividend
+            sbc edit_r_tl_x                     ; substract left margin
+            sta dividend                        ; store result in dividend (prepare division below)
             lda windowx+1
             sbc edit_r_tl_x+1
             sta dividend+1
-            lda #gapx
+            lda #gapx                           ; put gapx in divisor var
             sta divisor
             lda #0
             sta divisor+1
-            jsr divide 
+            jsr divide                          ; divide
             rts
 
-DodivY      lda windowy
+DodivY      lda windowy                         ; same with y coordinate 
             sec
             sbc edit_r_tl_y
             sta dividend
