@@ -1480,15 +1480,15 @@ DC_2        sta win_coord                   ; populate parameters for ScreenToWi
 
 outEditBox  
             TK_call InRect;refresh_r                ; test click in Refresh button
-            cmp #$80
+            cmp #$80                                ; click in button ?
             bne outRefr
 
-            TK_call SetPenMode;xSrcXOR
+            TK_call SetPenMode;xSrcXOR              ; yes : blink button
             TK_call SetPattern;White
             TK_call PaintRect;refresh_r
 
             TK_call SetPenMode;pencopy
-            jmp DrawWin2
+            jmp DrawWin2                            ; redraw window
 
 outRefr                                             ; here if click not in edit box 
                                                     ; nor in refresh button
@@ -1509,7 +1509,7 @@ outRefr                                             ; here if click not in edit 
             bne charOK                              ; if already 0, ring
             jmp DoRing
 charOK      dec DispChar                            ; else char = char - 1
-            jmp DrawWin2                            ; redraw window
+            jmp DrawWin2_2                          ; redraw left part of window content
 
 inRect1     TK_call InRect;AsciiRRect
             cmp #$80                                ; click in right arrow ?
@@ -1522,7 +1522,7 @@ inRect1     TK_call InRect;AsciiRRect
             cmp #127                                ; if allready 127 : ring
             bcs RingJmp
             inc DispChar                            ; else char = char - 1
-            jmp DrawWin2                            ; redraw window
+            jmp DrawWin2_2                          ; redraw left part of window content
 RingJmp     jmp RingBell
 
 inRect2     TK_call InRect;AsciiLfastR              
@@ -1538,12 +1538,12 @@ inRect2     TK_call InRect;AsciiLfastR
             bcs dosup10                             ; yes 
             lda #0                                  ; no : set char to 0
             sta DispChar
-            jmp DrawWin2                            ; and draw window
+            jmp DrawWin2_2                          ; redraw left part of window content
 dosup10     lda DispChar                            ; get current char
             sec
             sbc #16
             sta DispChar                            ; char = char - 16
-jstdraw     jmp DrawWin2                            ; redraw window
+jstdraw     jmp DrawWin2_2                          ; redraw left part of window content
 
 
 inRect3     TK_call InRect;AsciiRfastR
@@ -1555,19 +1555,32 @@ inRect3     TK_call InRect;AsciiRfastR
             TK_call PaintPoly;AsciiRfastP
             lda DispChar                            ; get current char
             cmp #127                                ; = 127 ? 
-            bne 1:                                  
+            bne :1                                  
             jmp RingBell                            ; yes : ring and exit
-1:          cmp #127-16                             ; <= 127-16 ?
+:1          cmp #127-16                             ; <= 127-16 ?
             bcs dosup127                            
             clc                                     ; yes :
             adc #16
             sta DispChar                            ; char = char + 16
-            jmp DrawWin2                            ; redraw window
+            jmp DrawWin2_2                          ; redraw left part of window content
 dosup127    lda #127                                ; no :
             sta DispChar                            ; char = 127
-            jmp DrawWin2                            ; redraw window
+            jmp DrawWin2_2                          ; redraw left part of window content
 
-* XXXXXXXXXXXXXXXXXXXXXXxXX + repaint only letf part of window.
+DrawWin2_2 equ *                                    ; redraw only letf part of window.   
+            TK_call HideCursor;0
+
+            TK_call SetPattern;White 
+            TK_call PaintRect;halfwinR              ; empty left half window content with white
+            TK_call SetPattern;Black
+            jsr ShowLabel1                          ; display top label
+            jsr ShowCharGrid                        ; display char grid
+            jsr ShowRefresh                         ; display "Refresh Window" button
+            jsr ShowAsciiL
+            TK_call ShowCursor;0
+            rts
+halfwinR    dw 0,0,198,130
+
 
 DoRing      jmp RingBell
 
