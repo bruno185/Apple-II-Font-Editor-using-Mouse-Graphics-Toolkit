@@ -1,9 +1,10 @@
 *
 *********************************
 *                               *
+* ==>>   Font explorer    <<=   *
+*           based on            *
 *  Mouse Graphics Toolkit Demo  *
-*  ==>>   Font explorer    <<=  *
-*                               * 
+*                               *
 *********************************
 *
             org $800
@@ -112,13 +113,13 @@ start       equ *
 * control passes to the quitting routine.
 *
 ********************************************
-Demo_1 equ *
+MainLoop    equ *
             lda Quit            ; quit flag
-            beq Demo_1_1        ; = 0 ==> main loop
+            beq MainLoop_1      ; = 0 ==> main loop
 ;
             jmp Killer          ; <> 0 ==> exit
 ;
-Demo_1_1 equ *
+MainLoop_1  equ *
             TK_call GetEvent;TheEvent ; Get the next event
             ; Returns the next event from the event queue
             ; Parameters :
@@ -167,22 +168,22 @@ Demo_1_1 equ *
             lda TheEvent ; Transfer control to appropriate part of program
             ; get 1st byte of Event reconrd = event type.
 
-            cmp #ButnDown       ; mouse button down ?
-            bne Demo_3          ; no : check next event type
+Test_M      cmp #ButnDown       ; mouse button down ?
+            bne Test_K          ; no : check next event type
             jsr HandleButton    ; yes : gosub HandleButton
-            jmp Demo_1          ; and loop 
+            jmp MainLoop        ; and loop 
 ;
-Demo_3      cmp #KeyPress       ; key pressed event ?
-            bne Demo_4          ; no : check next event type
+Test_K      cmp #KeyPress       ; key pressed event ?
+            bne Test_U          ; no : check next event type
             jsr HandleKeypress  ; yes : gosub HandleKeypress
-            jmp Demo_1          ; and loop 
+            jmp MainLoop        ; and loop 
 ;
-Demo_4      cmp #UpdateEvt      ; update event ?
-            bne Demo_5          ; no : loop
+Test_U      cmp #UpdateEvt      ; update event ?
+            bne Test_Other      ; no : loop
             jsr HandleUpdate    ; yes : gosub HandleUpdate 
-            jmp Demo_1          ; loop
+            jmp MainLoop        ; loop
 ;
-Demo_5      jmp Demo_1 ; ignore all other events 
+Test_Other  jmp MainLoop ; ignore all other events 
                                 ; ignore : no_event ; button_up ; drag ; apple_key ; (+ user events)
 ;
 ;
@@ -269,14 +270,14 @@ DrawWin1    equ *                              ; Sample Window
             TK_call DrawText;lazyfox
             TK_call MoveTo;lazyptC
             TK_call DrawText;lazyfoxC
- 
             rts
+
 lazyfox     da lazy_txt+1
 lazy_txt    str 'the lazy fox jumps over the brown dog'
 lazypt      dw 10,10
-lazyfoxC     da lazy_txtC+1
-lazy_txtC    str 'THE LAZY FOX JUMPS OVER THE BROWN DOG'
-lazyptC      dw 10,20
+lazyfoxC    da lazy_txtC+1
+lazy_txtC   str 'THE LAZY FOX JUMPS OVER THE BROWN DOG'
+lazyptC     dw 10,20
 
 DrawWin2 equ *                                  ; EditFontW   
             TK_call HideCursor;0
@@ -311,22 +312,18 @@ altext      str 'Char ASCII value :'
 
 AsciiLRect dw 220,64,230,74
 AsciiRRect dw 267,64,277,74
-AsciiLPoly  
-            db 3,0
+
+AsciiLPoly  db 3,0
             dw 230,74,230,64,220,69
-AsciiRPoly  
-            db 3,0
+AsciiRPoly  db 3,0
             dw 267,74,267,64,277,69
 
 AsciiLfastR dw 197,64,215,74
 AsciiLfastP db 7,0
             dw 215,74,215,64,207,67,207,64,197,69,207,74,207,71
-
 AsciiRfastR dw 282,64,300,74
 AsciiRfastP db 7,0
             dw 282,74,282,64,290,67,290,64,300,69,290,74,290,71
-
-
 * polygon list struture :
 ; db : nb. of vertices
 ; db polylast :  0 ; $80 if not last.EvtKe
@@ -475,12 +472,10 @@ MoveRectY                                       ; move bitmap view loc 10 pix do
             rts
 
 IntiRectX                                      ; copy BasePoint.x to aRectTopLeft.x
-            ldx #00
-:1          lda BasePoint,x                     
-            sta aRectTopLeft,x         
-            inx 
-            cpx #2                              ; x : 16 bit integer
-            bne :1 
+            lda BasePoint                     
+            sta aRectTopLeft         
+            lda BasePoint+1                   
+            sta aRectTopLeft+1 
             rts  
 
 TheChar     ds 1     
@@ -925,6 +920,10 @@ HandleMenu  equ * ; Takes result from menu commands and acts accordingly.
             lda MenuCmd     ; If no selection was made, menu_id (= MenuCmd) is set to 0.
             ;bne *+3
             bne HM_1
+                                                    ; here if MenuCmd=0 (ie not a menu command, or user did not select 
+                                                    ; any menu item) 
+            lda MenuChar                            ; get ascii char                            
+            beq HM_exit                             ; 0 : exit
             TK_call FrontWindow;OnTop               ; get top window
             lda OnTop                               ; in A
             cmp EditFontW                           ; = EditFontW ?
@@ -933,7 +932,6 @@ HandleMenu  equ * ; Takes result from menu commands and acts accordingly.
             sta DispChar                            ; set it for draw function for this window
             lda EditFontW
             jmp DrawItB                             ; draw window (+SetPort)
-
 HM_exit     rts 
 ;
 HM_1
@@ -1456,7 +1454,8 @@ DoClickIn                                   ; after click in EditFontW content
             cmp EditFontW                   ; = EditFontW ?
             beq DC_2                        ; yes : proceed with a click in EditFontW
             rts                             ; no : exit
-DC_2        sta win_coord                   ; populate parameters for ScreenToWindow call
+DC_2        
+            sta win_coord                   ; populate parameters for ScreenToWindow call
             ldx #00
 :2          lda MouseX,x                    ; copy point in sreen coordinate 
             sta screenx,x                   ; to screenx/screeny input parameter
@@ -1579,7 +1578,7 @@ DrawWin2_2 equ *                                    ; redraw only letf part of w
             jsr ShowAsciiL
             TK_call ShowCursor;0
             rts
-halfwinR    dw 0,0,198,130
+halfwinR    dw 0,0,190,130
 
 
 DoRing      jmp RingBell
@@ -1913,6 +1912,14 @@ DoClose_1   TK_call CloseWindow;WindowFound
             TK_call FrontWindow;OnTop           ; get window now on top (if any)
             lda OnTop                           ; get it's ID
             beq DoClose_2                       ; ID = 0 : no window => rts
+
+            ********************************************************************** 
+            *not in demo, necessary to make sur port is set top window's grafport.
+            **********************************************************************
+            sta GWParms                         
+            TK_call GetWinPort;GWParms
+            TK_call SetPort;TempPort    
+
             jsr CheckWindow                     ; check menu item corresponding to the window now on top
 DoClose_2   rts
 *
@@ -2557,7 +2564,7 @@ testl       lda workfont,x          ; LoadFlag <> 0  : set 'WORK.TEST' as file n
             sta tfont+1,x 
             dex  
             bpl testl
-            jmp LoadStart
+            bmi LoadStart           ; will always branch
 
 workl       lda testfont,x          ; LoadFlag = 0  : set 'TEST.TEST' as file name (system font)
             sta tfont+1,x 
@@ -2614,7 +2621,6 @@ Conftext    str 'Changes will be lost, can you confirm?'
 
 SaveFont    
             jsr DoPrefix            ; set prefix in path var (strating and ending with /
-
             ldx #3
 testl2      lda workfont,x          ; set 'WORK.TEST' as file name
             sta tfont+1,x 
@@ -2628,7 +2634,7 @@ testl2      lda workfont,x          ; set 'WORK.TEST' as file name
             beq DoOpen2             ; if value = 0 : exit loop
             sta path,x              ; store char at the end of prefix string
             iny                     ; next char
-            jmp :1                  ; loop
+            bne :1                  ; loop 
 
 DoOpen2                             ; adjust prefix length
             lda path                ; by adding file name length
@@ -2657,7 +2663,6 @@ CloseFile2                          ; and close file
             jsr MLI
             dfb close
             da closeparam
-
             rts
 
 writeparam
