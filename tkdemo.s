@@ -1,7 +1,7 @@
 *
 *********************************
 *                               *
-* ==>>   Font explorer    <<=   *
+* ==>>   Font explorer    <<==  *
 *           based on            *
 *  Mouse Graphics Toolkit Demo  *
 *                               *
@@ -223,8 +223,8 @@ Update_1    rts
 DrawItB equ *                                   ; Set port to window whose ID is in A
                                                 ; then draw its content
             ; set grafport 
-            sta GWParms ; Get the port for the current window
             ; A = window ID 
+            sta GWParms ; Get the port for the current window
             TK_call GetWinPort;GWParms
             ; GetWinPort : returns the grafport corresponding to a window's visible area.
             ; Parameter : pointer to a struture : window ID (1st byte), TempPort (next bytes) : pointer to an empty grafport

@@ -4,7 +4,7 @@
     1 |  1  tkdemo.s      1 | Comment     | 11 |         |    0 | 00/8000               | *
     2 |  1  tkdemo.s      2 | Comment     | 11 |         |    0 | 00/8000               | *********************************
     3 |  1  tkdemo.s      3 | Comment     | 11 |         |    0 | 00/8000               | *                               *
-    4 |  1  tkdemo.s      4 | Comment     | 11 |         |    0 | 00/8000               | * ==>>   Font explorer    <<=   *
+    4 |  1  tkdemo.s      4 | Comment     | 11 |         |    0 | 00/8000               | * ==>>   Font explorer    <<==  *
     5 |  1  tkdemo.s      5 | Comment     | 11 |         |    0 | 00/8000               | *           based on            *
     6 |  1  tkdemo.s      6 | Comment     | 11 |         |    0 | 00/8000               | *  Mouse Graphics Toolkit Demo  *
     7 |  1  tkdemo.s      7 | Comment     | 11 |         |    0 | 00/8000               | *                               *
@@ -551,8 +551,8 @@
   548 |  1  tkdemo.s    223 | Equivalence | 11 |         |    0 | 00/08B2               | DrawItB          equ       ozunid_17            ; Set port to window whose ID is in A
   549 |  1  tkdemo.s    224 | Comment     | 11 |         |    0 | 00/08B2               |                                                 ; then draw its content
   550 |  1  tkdemo.s    225 | Comment     | 11 |         |    0 | 00/08B2               |             ; set grafport 
-  551 |  1  tkdemo.s    226 | Code        | 11 |         |    3 | 00/08B2 : 8D 12 11    |                  sta       GWParms              ; Get the port for the current window
-  552 |  1  tkdemo.s    227 | Comment     | 11 |         |    0 | 00/08B5               |             ; A = window ID 
+  551 |  1  tkdemo.s    226 | Comment     | 11 |         |    0 | 00/08B2               |             ; A = window ID 
+  552 |  1  tkdemo.s    227 | Code        | 11 |         |    3 | 00/08B2 : 8D 12 11    |                  sta       GWParms              ; Get the port for the current window
   553 |  1  tkdemo.s    228 | Macro       | 11 |         |    0 | 00/08B5               |                  TK_call   {{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{26}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1};GWParms
   554 |  1  tkdemo.s    228 | Code        | 11 |         |    3 | 00/08B5 : 20 00 40    |                  jsr       {$4000}              
   555 |  1  tkdemo.s    228 | Data        | 11 |         |    1 | 00/08B8 : 3B          |                  dfb       {{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{26}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}+1}; command ID (1 byte)
